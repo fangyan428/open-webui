@@ -46,7 +46,6 @@ from open_webui.models.config import Config
 from open_webui.models.groups import Groups
 from open_webui.models.tools import Tools
 from open_webui.models.users import UserModel
-from open_webui.utils.chat_id import is_saved_chat_id
 from open_webui.tools.builtin import (
     add_memory,
     calculate_timestamp,
@@ -103,6 +102,8 @@ from open_webui.tools.builtin import (
     write_note,
 )
 from open_webui.utils.access_control import has_access, has_connection_access, has_permission
+from open_webui.utils.access_control.model_knowledge import is_model_rag_only
+from open_webui.utils.chat_id import is_saved_chat_id
 from open_webui.utils.headers import get_custom_headers, include_user_info_headers
 from open_webui.utils.misc import is_string_allowed
 from open_webui.utils.plugin import get_tool_contents_cache, get_tools_cache, load_tool_module_by_id
@@ -603,7 +604,11 @@ async def get_builtin_tools(
     if is_builtin_tool_enabled('knowledge'):
         from open_webui.env import ENABLE_KB_EXEC
 
-        if ENABLE_KB_EXEC:
+        # Inference-only model attachments deliberately expose semantic RAG,
+        # not browsing, grep, file listing, or raw-content tools.
+        if any(is_model_rag_only(item) for item in model_knowledge):
+            builtin_functions.append(query_knowledge_files)
+        elif ENABLE_KB_EXEC:
             builtin_functions.append(kb_exec)
             builtin_functions.append(query_knowledge_files)
             # Notes attached to the model need view_note since kb_exec is file-only

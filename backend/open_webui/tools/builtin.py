@@ -58,6 +58,7 @@ from open_webui.routers.retrieval import search_web as _search_web
 from open_webui.tasks import stop_item_tasks
 from open_webui.events import EVENTS, publish_event
 from open_webui.socket.main import sio
+from open_webui.utils.access_control.model_knowledge import is_model_rag_only
 from open_webui.utils.chat_id import is_saved_chat_id
 from open_webui.utils.notifications import notify_target
 from open_webui.utils.sanitize import sanitize_code
@@ -3063,7 +3064,8 @@ async def query_knowledge_files(
                     # Knowledge base - use KB ID as collection name
                     knowledge = await Knowledges.get_knowledge_by_id(item_id)
                     if knowledge and (
-                        user_role == 'admin'
+                        is_model_rag_only(item)
+                        or user_role == 'admin'
                         or knowledge.user_id == user_id
                         or await AccessGrants.has_access(
                             user_id=user_id,

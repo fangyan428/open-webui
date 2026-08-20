@@ -113,6 +113,7 @@ from open_webui.utils.misc import (
     get_output_text,
     get_system_message,
     is_string_allowed,
+    is_tool_name_allowed,
     merge_system_messages,
     prepend_to_first_user_message_content,
     replace_system_message_content,
@@ -2207,12 +2208,19 @@ async def connect_mcp_server(
     """
     mcp_server_connection = None
     for server_connection in await Config.get('tool_server.connections', []):
-        if server_connection.get('type', '') == 'mcp' and (server_connection.get('info') or {}).get('id') == server_id:
+        if (
+            server_connection.get('type', '') == 'mcp'
+            and (server_connection.get('info') or {}).get('id') == server_id
+        ):
             mcp_server_connection = server_connection
             break
 
     if not mcp_server_connection:
         log.error(f'MCP server with id {server_id} not found')
+        return None
+
+    if not (mcp_server_connection.get('config') or {}).get('enable', True):
+        log.warning(f'MCP server {server_id} is disabled')
         return None
 
     if not await has_connection_access(user, mcp_server_connection):
@@ -2240,7 +2248,7 @@ async def connect_mcp_server(
 
     tool_specs = await client.list_tool_specs()
     if function_name_filter_list:
-        tool_specs = [spec for spec in tool_specs if is_string_allowed(spec['name'], function_name_filter_list)]
+        tool_specs = [spec for spec in tool_specs if is_tool_name_allowed(spec['name'], function_name_filter_list)]
 
     return client, tool_specs
 
@@ -2595,7 +2603,12 @@ async def process_chat_payload(request, form_data, user, metadata, model):
                         append=True,
                     )
 
-    tool_ids = form_data.pop('tool_ids', None)
+    requested_tool_ids = form_data.pop('tool_ids', None) or []
+    model_tool_ids = model.get('info', {}).get('meta', {}).get('toolIds', []) or []
+    # Model tools are administrator-controlled defaults. Resolve them on the
+    # server so a fresh user does not depend on browser settings or a prior UI
+    # round-trip. Existing tool/MCP access checks still run for every ID below.
+    tool_ids = list(dict.fromkeys([*model_tool_ids, *requested_tool_ids])) or None
     terminal_id = form_data.pop('terminal_id', None)
     files = form_data.pop('files', None)
     form_data.pop('folder_id', None)

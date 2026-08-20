@@ -198,6 +198,8 @@ async def get_models(
         # callers, mirroring the per-id endpoint.
         if not write_access:
             data['params'] = {}
+            if data.get('meta'):
+                data['meta'].pop('knowledge', None)
         items.append(ModelAccessResponse(**data, write_access=write_access))
 
     return ModelAccessListResponse(
@@ -545,6 +547,8 @@ async def get_model_by_id(id: str, user=Depends(get_verified_user), db: AsyncSes
             # working for users who legitimately curate the model.
             if not write_access:
                 model_dict['params'] = {}
+                if model_dict.get('meta'):
+                    model_dict['meta'].pop('knowledge', None)
             return ModelAccessResponse(
                 **model_dict,
                 write_access=write_access,

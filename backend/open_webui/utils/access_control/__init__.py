@@ -312,9 +312,10 @@ async def has_base_model_access(
 
     A base model without a ``model`` table row is admin-only, matching how
     unregistered models are treated for direct use (``get_filtered_models``
-    hides them from non-admins and ``check_model_access`` rejects them), so
-    a shared preset cannot be used to reach a base model the caller could
-    not use directly.  Returns ``False`` the moment any hop denies access.
+    hides them from non-admins and ``check_model_access`` rejects them). The
+    exception is a system-owned managed preset: its provider model is
+    administrator configuration and is intentionally exposed only through
+    that preset. Returns ``False`` the moment any hop denies access.
     """
     from open_webui.models.access_grants import AccessGrants
     from open_webui.models.models import Models
@@ -325,7 +326,7 @@ async def has_base_model_access(
         seen.add(base_model_id)
         base_model_info = await Models.get_model_by_id(base_model_id, db=db)
         if base_model_info is None:
-            return user_role == 'admin'
+            return user_role == 'admin' or getattr(model_info, 'user_id', None) == 'system'
         if not (
             user_id == base_model_info.user_id
             or await AccessGrants.has_access(

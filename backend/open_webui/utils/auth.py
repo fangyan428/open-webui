@@ -522,6 +522,16 @@ def get_admin_user(user=Depends(get_current_user)):
     return user
 
 
+def get_admin_user_forbidden(user=Depends(get_current_user)):
+    """Require an authenticated administrator and return 403 for other roles."""
+    if user.role != 'admin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
+        )
+    return user
+
+
 async def create_admin_user(email: str, password: str, name: str = 'Admin'):
     """
     Create an admin user from environment variables.

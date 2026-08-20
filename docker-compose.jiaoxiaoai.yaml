@@ -1,0 +1,6 @@
+services:
+  open-webui:
+    env_file:
+      - ./deploy/jiaoxiaoai.env
+    environment: !reset []
+

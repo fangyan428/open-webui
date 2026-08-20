@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import logging
 import mimetypes
@@ -198,6 +199,7 @@ from open_webui.tasks import (
 )  # Import from tasks.py
 from open_webui.utils import logger
 from open_webui.utils.access_control import has_permission
+from open_webui.utils.access_control.model_knowledge import resolve_model_knowledge_for_inference
 from open_webui.utils.actions import chat_action as chat_action_handler
 from open_webui.utils.asgi_middleware import (
     AuthTokenMiddleware,
@@ -229,6 +231,7 @@ from open_webui.utils.chat_variables import (
     normalize_chat_variables,
 )
 from open_webui.utils.embeddings import generate_embeddings
+from open_webui.utils.jiaoxiaoai import seed_jiaoxiaoai_model
 from open_webui.utils.json_response import apply_orjson_http_json
 from open_webui.utils.logger import start_logger
 from open_webui.utils.middleware import (
@@ -337,6 +340,7 @@ async def lifespan(app: FastAPI):
 
     await import_legacy_config_json()
     await seed_registered_defaults()
+    await seed_jiaoxiaoai_model()
     await initialize_runtime_config(app)
     await migrate_legacy_webhook_config()
     await publish_event(app, EVENTS.SYSTEM_STARTUP_STARTED, source='system')
@@ -854,7 +858,15 @@ async def get_models(request: Request, refresh: bool = False, user=Depends(get_v
     # models the caller can actually see.
     models = await get_filtered_models(models, user)
 
+    # Never mutate the shared model cache while shaping a user-specific response.
+    models = copy.deepcopy(models)
+
     for model in models:
+        # Attached knowledge is server-side execution configuration, not part
+        # of the student-facing model catalogue.
+        if user.role != 'admin':
+            model.get('info', {}).get('meta', {}).pop('knowledge', None)
+
         # Remove profile image URL to reduce payload size
         if model.get('info', {}).get('meta', {}).get('profile_image_url'):
             model['info']['meta'].pop('profile_image_url', None)
@@ -1080,8 +1092,20 @@ async def chat_completion(
                 except Exception as e:
                     raise e
         else:
-            model = model_item
+            model = copy.deepcopy(model_item)
             await _set_direct_model(request, model, user)
+
+        if not model_item.get('direct', False):
+            # The application model cache is shared by every user. Resolve
+            # inference-only attachments on a request-local copy after model
+            # access has already been checked above.
+            model = copy.deepcopy(model)
+            model_meta = model.get('info', {}).get('meta', {})
+            if model_meta.get('knowledge'):
+                model_meta['knowledge'] = await resolve_model_knowledge_for_inference(
+                    model_meta['knowledge'],
+                    user,
+                )
 
         # Model params: global defaults as base, per-model overrides win
         default_model_params = await Config.get('models.default_params', {}) or {}

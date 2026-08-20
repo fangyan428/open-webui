@@ -12,7 +12,7 @@ from open_webui.env import AIOHTTP_CLIENT_SESSION_SSL, AIOHTTP_CLIENT_TIMEOUT
 from open_webui.events import EVENTS, publish_event
 from open_webui.models.config import Config
 from open_webui.models.oauth_sessions import OAuthSessions
-from open_webui.utils.auth import get_admin_user, get_verified_user
+from open_webui.utils.auth import get_admin_user, get_admin_user_forbidden, get_verified_user
 from open_webui.utils.headers import get_custom_headers
 from open_webui.utils.mcp.client import MCPClient
 from open_webui.utils.oauth import (
@@ -232,7 +232,7 @@ class ToolServersConfigForm(BaseModel):
 
 
 @router.get('/tool_servers', response_model=ToolServersConfigForm)
-async def get_tool_servers_config(request: Request, user=Depends(get_admin_user)):
+async def get_tool_servers_config(request: Request, user=Depends(get_admin_user_forbidden)):
     return {'TOOL_SERVER_CONNECTIONS': await Config.get('tool_server.connections')}
 
 
@@ -240,7 +240,7 @@ async def get_tool_servers_config(request: Request, user=Depends(get_admin_user)
 async def set_tool_servers_config(
     request: Request,
     form_data: ToolServersConfigForm,
-    user=Depends(get_admin_user),
+    user=Depends(get_admin_user_forbidden),
 ):
     existing_connections = await Config.get('tool_server.connections', []) or []
     for connection in existing_connections:
@@ -543,7 +543,11 @@ async def refresh_terminal_server_terminals(
 
 
 @router.post('/tool_servers/verify')
-async def verify_tool_servers_config(request: Request, form_data: ToolServerConnection, user=Depends(get_admin_user)):
+async def verify_tool_servers_config(
+    request: Request,
+    form_data: ToolServerConnection,
+    user=Depends(get_admin_user_forbidden),
+):
     """
     Verify the connection to the tool server.
     """

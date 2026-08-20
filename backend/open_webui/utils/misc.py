@@ -78,6 +78,23 @@ def is_string_allowed(string: Union[str, Sequence[str]], filter_list: list[str |
     return True
 
 
+def is_tool_name_allowed(tool_name: str, filter_list: list[str | None] = None) -> bool:
+    """Apply an exact allow/block list to an MCP tool name.
+
+    Tool names are identifiers rather than hostnames, so suffix matching can
+    accidentally admit a newly added action whose name ends with an allowed
+    read-only tool name.
+    """
+    if not filter_list:
+        return True
+
+    allow_list, block_list = get_allow_block_lists(filter_list)
+    if allow_list and tool_name not in allow_list:
+        return False
+
+    return tool_name not in block_list
+
+
 def _host_matches_pattern(host: str, pattern: str) -> bool:
     """Match a hostname against a filter entry on DNS label boundaries.
 
