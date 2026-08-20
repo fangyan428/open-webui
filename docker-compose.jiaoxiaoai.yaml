@@ -6,4 +6,4 @@ services:
     ports: !override
       - "3001:8080"
     volumes: !override
-      - ./deploy/jiaoxiaoai-data:/app/backend/data
+      - ./.cptr/jiaoxiaoai-data:/app/backend/data
