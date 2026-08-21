@@ -76,12 +76,14 @@
 	}
 
 	let system = '';
+	const defaultProfileImageUrl = `${WEBUI_BASE_URL}/branding/sai-symbol.svg`;
+
 	let info = {
 		id: '',
 		base_model_id: null,
 		name: '',
 		meta: {
-			profile_image_url: `${WEBUI_BASE_URL}/static/favicon.png`,
+			profile_image_url: defaultProfileImageUrl,
 			description: '',
 			suggestion_prompts: null,
 			tags: []
@@ -481,6 +483,14 @@
 				)
 			};
 
+			if (
+				[`${WEBUI_BASE_URL}/favicon.png`, `${WEBUI_BASE_URL}/static/favicon.png`].includes(
+					info?.meta?.profile_image_url ?? ''
+				)
+			) {
+				info.meta.profile_image_url = defaultProfileImageUrl;
+			}
+
 			console.log(model);
 		}
 
@@ -603,7 +613,7 @@
 								<div class="flex min-w-0 flex-1 items-center gap-3">
 									<button
 										class="group relative flex size-12 shrink-0 items-center overflow-hidden rounded-xl md:size-14 {info
-											.meta.profile_image_url !== `${WEBUI_BASE_URL}/static/favicon.png`
+											.meta.profile_image_url !== defaultProfileImageUrl
 											? 'bg-transparent'
 											: 'bg-gray-50 dark:bg-gray-850'} ring-1 ring-gray-200/70 transition hover:ring-gray-300 dark:ring-white/10 dark:hover:ring-white/20"
 										type="button"

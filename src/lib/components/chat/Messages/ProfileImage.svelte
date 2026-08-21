@@ -3,7 +3,7 @@
 	import { safeImageUrl } from '$lib/utils/safeImageUrl';
 
 	export let className = 'size-8';
-	export let src = `${WEBUI_BASE_URL}/static/favicon.png`;
+	export let src = `${WEBUI_BASE_URL}/branding/sai-symbol.svg`;
 </script>
 
 <img
@@ -12,4 +12,8 @@
 	class=" {className} object-cover rounded-2xl"
 	alt="profile"
 	draggable="false"
+	on:error={(e) => {
+		e.currentTarget.onerror = null;
+		e.currentTarget.src = `${WEBUI_BASE_URL}/branding/sai-symbol.svg`;
+	}}
 />

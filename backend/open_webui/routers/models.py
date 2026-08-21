@@ -48,6 +48,8 @@ log = logging.getLogger(__name__)
 
 router = APIRouter()
 
+DEFAULT_MODEL_PROFILE_IMAGE_URL = '/branding/sai-symbol.svg'
+
 
 def add_chat_variables_schema(model_dict: dict) -> dict:
     system = (model_dict.get('params') or {}).get('system') if isinstance(model_dict.get('params'), dict) else None
@@ -614,7 +616,7 @@ async def get_model_profile_image(
                 # only serve known-safe raster types inline; reject SVG/unknown (can run script on our origin)
                 if media_type not in PROFILE_IMAGE_ALLOWED_MIME_TYPES:
                     return RedirectResponse(
-                        url='/static/favicon.png',
+                        url=DEFAULT_MODEL_PROFILE_IMAGE_URL,
                         status_code=status.HTTP_302_FOUND,
                     )
 
@@ -636,12 +638,12 @@ async def get_model_profile_image(
             safe_static = _safe_static_redirect_path(profile_image_url)
             if safe_static:
                 return RedirectResponse(
-                    url=safe_static,
+                    url=(DEFAULT_MODEL_PROFILE_IMAGE_URL if safe_static == '/static/favicon.png' else safe_static),
                     status_code=status.HTTP_302_FOUND,
                 )
 
     return RedirectResponse(
-        url='/static/favicon.png',
+        url=DEFAULT_MODEL_PROFILE_IMAGE_URL,
         status_code=status.HTTP_302_FOUND,
     )
 

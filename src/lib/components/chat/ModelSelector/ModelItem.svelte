@@ -88,7 +88,8 @@
 						class="flex size-4 items-center rounded-full"
 						loading="lazy"
 						on:error={(e) => {
-							e.currentTarget.src = '/favicon.png';
+							e.currentTarget.onerror = null;
+							e.currentTarget.src = '/branding/sai-symbol.svg';
 						}}
 					/>
 				</Tooltip>

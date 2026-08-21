@@ -219,6 +219,50 @@ def test_provider_routes_keep_upstream_behavior_outside_managed_mode(monkeypatch
     assert provider_route_allowed('user') is True
 
 
+@pytest.mark.asyncio
+async def test_default_model_profile_uses_sai_symbol(monkeypatch):
+    from open_webui.routers.models import get_model_profile_image
+
+    monkeypatch.setattr(
+        'open_webui.routers.models.Models.get_model_meta_by_id',
+        AsyncMock(return_value=None),
+    )
+    monkeypatch.setattr(
+        'open_webui.routers.models.Config.get',
+        AsyncMock(return_value=[]),
+    )
+
+    response = await get_model_profile_image(
+        request=SimpleNamespace(),
+        id='model-without-custom-profile',
+        user=student(),
+        db=SimpleNamespace(),
+    )
+
+    assert response.status_code == 302
+    assert response.headers['location'] == '/branding/sai-symbol.svg'
+
+
+@pytest.mark.asyncio
+async def test_legacy_oi_model_profile_uses_sai_symbol(monkeypatch):
+    from open_webui.routers.models import get_model_profile_image
+
+    monkeypatch.setattr(
+        'open_webui.routers.models.Models.get_model_meta_by_id',
+        AsyncMock(return_value=({'profile_image_url': '/static/favicon.png'}, None)),
+    )
+
+    response = await get_model_profile_image(
+        request=SimpleNamespace(),
+        id='model-with-legacy-oi-profile',
+        user=student(),
+        db=SimpleNamespace(),
+    )
+
+    assert response.status_code == 302
+    assert response.headers['location'] == '/branding/sai-symbol.svg'
+
+
 @pytest.mark.parametrize(
     ('owner_id', 'user_role', 'expected'),
     [

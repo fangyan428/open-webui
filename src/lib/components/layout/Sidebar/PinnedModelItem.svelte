@@ -40,7 +40,8 @@
 					class=" size-4 rounded-full"
 					alt="logo"
 					on:error={(e) => {
-						e.currentTarget.src = '/favicon.png';
+						e.currentTarget.onerror = null;
+						e.currentTarget.src = '/branding/sai-symbol.svg';
 					}}
 				/>
 			</div>

@@ -260,7 +260,8 @@
 						alt={model?.name ?? model.id}
 						class="mr-2 size-4.5 rounded-full object-cover"
 						on:error={(e) => {
-							(e.currentTarget as HTMLImageElement).src = '/favicon.png';
+							(e.currentTarget as HTMLImageElement).onerror = null;
+							(e.currentTarget as HTMLImageElement).src = '/branding/sai-symbol.svg';
 						}}
 					/>
 					<div class="min-w-0 truncate">

@@ -37,7 +37,8 @@
 		}
 	};
 
-	let profileImageUrl = `${WEBUI_BASE_URL}/favicon.png`;
+	const defaultProfileImageUrl = `${WEBUI_BASE_URL}/branding/sai-symbol.svg`;
+	let profileImageUrl = defaultProfileImageUrl;
 	let description = '';
 
 	let selectedModelId = '';
@@ -93,7 +94,7 @@
 
 		name = '';
 		id = '';
-		profileImageUrl = `${WEBUI_BASE_URL}/favicon.png`;
+		profileImageUrl = defaultProfileImageUrl;
 		description = '';
 		modelIds = [];
 		selectedModelId = '';
@@ -103,7 +104,12 @@
 		if (model) {
 			name = model.name;
 			id = model.id;
-			profileImageUrl = model.meta.profile_image_url;
+			profileImageUrl = [
+				`${WEBUI_BASE_URL}/favicon.png`,
+				`${WEBUI_BASE_URL}/static/favicon.png`
+			].includes(model.meta.profile_image_url)
+				? defaultProfileImageUrl
+				: model.meta.profile_image_url;
 			description = model.meta.description;
 			modelIds = model.meta.model_ids || [];
 			filterMode = model.meta?.filter_mode ?? 'include';
