@@ -65,43 +65,72 @@
 					<div
 						class="flex min-w-0 mr-1.5 items-center gap-0.5 md:gap-1 scrollbar-none overflow-x-auto w-fit text-center text-sm font-normal rounded-full bg-transparent py-1 touch-auto pointer-events-auto"
 					>
-						<a
-							draggable="false"
-							class="min-w-fit px-1 text-sm {$page.url.pathname.includes('/admin/users')
-								? ''
-								: 'text-gray-300 dark:text-gray-600 hover:text-gray-700 dark:hover:text-white'} transition select-none"
-							href="/admin">{$i18n.t('Users')}</a
-						>
-
-						<a
-							draggable="false"
-							class="min-w-fit px-1 text-sm {$page.url.pathname.includes('/admin/evaluations')
-								? ''
-								: 'text-gray-300 dark:text-gray-600 hover:text-gray-700 dark:hover:text-white'} transition select-none"
-							href="/admin/evaluations">{$i18n.t('Evaluations')}</a
-						>
-
-						{#if $config?.features?.enable_plugins}
+						{#if $config?.features?.jiaoxiaoai_managed_mode}
 							<a
 								draggable="false"
-								class="min-w-fit px-1 text-sm {$page.url.pathname.includes('/admin/functions')
+								class="min-w-fit px-1 text-sm {$page.url.pathname === '/admin' ||
+								$page.url.pathname.includes('/admin/users')
 									? ''
 									: 'text-gray-300 dark:text-gray-600 hover:text-gray-700 dark:hover:text-white'} transition select-none"
-								href="/admin/functions">{$i18n.t('Functions')}</a
+								href="/admin">{$i18n.t('Users')}</a
+							>
+
+							<a
+								draggable="false"
+								class="min-w-fit px-1 text-sm text-gray-300 dark:text-gray-600 hover:text-gray-700 dark:hover:text-white transition select-none"
+								href="/?settings=admin%3Aanalytics"
+								on:click={(event) => {
+									event.preventDefault();
+									showSettings.set('admin:analytics');
+								}}>{$i18n.t('Analytics')}</a
+							>
+
+							<a
+								draggable="false"
+								class="min-w-fit px-1 text-sm {$page.url.pathname.includes('/admin/jiaoxiaoai')
+									? ''
+									: 'text-gray-300 dark:text-gray-600 hover:text-gray-700 dark:hover:text-white'} transition select-none"
+								href="/admin/jiaoxiaoai">交小AI设置</a
+							>
+						{:else}
+							<a
+								draggable="false"
+								class="min-w-fit px-1 text-sm {$page.url.pathname.includes('/admin/users')
+									? ''
+									: 'text-gray-300 dark:text-gray-600 hover:text-gray-700 dark:hover:text-white'} transition select-none"
+								href="/admin">{$i18n.t('Users')}</a
+							>
+
+							<a
+								draggable="false"
+								class="min-w-fit px-1 text-sm {$page.url.pathname.includes('/admin/evaluations')
+									? ''
+									: 'text-gray-300 dark:text-gray-600 hover:text-gray-700 dark:hover:text-white'} transition select-none"
+								href="/admin/evaluations">{$i18n.t('Evaluations')}</a
+							>
+
+							{#if $config?.features?.enable_plugins}
+								<a
+									draggable="false"
+									class="min-w-fit px-1 text-sm {$page.url.pathname.includes('/admin/functions')
+										? ''
+										: 'text-gray-300 dark:text-gray-600 hover:text-gray-700 dark:hover:text-white'} transition select-none"
+									href="/admin/functions">{$i18n.t('Functions')}</a
+								>
+							{/if}
+
+							<a
+								draggable="false"
+								class="min-w-fit px-1 text-sm {$page.url.pathname.includes('/admin/settings')
+									? ''
+									: 'text-gray-300 dark:text-gray-600 hover:text-gray-700 dark:hover:text-white'} transition select-none"
+								href="/admin/settings"
+								on:click={(event) => {
+									event.preventDefault();
+									showSettings.set('admin:general');
+								}}>{$i18n.t('Settings')}</a
 							>
 						{/if}
-
-						<a
-							draggable="false"
-							class="min-w-fit px-1 text-sm {$page.url.pathname.includes('/admin/settings')
-								? ''
-								: 'text-gray-300 dark:text-gray-600 hover:text-gray-700 dark:hover:text-white'} transition select-none"
-							href="/admin/settings"
-							on:click={(event) => {
-								event.preventDefault();
-								showSettings.set('admin:general');
-							}}>{$i18n.t('Settings')}</a
-						>
 					</div>
 				</div>
 			</div>

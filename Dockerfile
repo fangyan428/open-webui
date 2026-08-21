@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # Initialize device type args
 # use build args in the docker build command with --build-arg="BUILDARG=true"
 ARG USE_CUDA=false
@@ -25,22 +24,39 @@ ARG GID=0
 
 ######## WebUI frontend ########
 FROM --platform=$BUILDPLATFORM node:22-alpine3.20 AS build
+ARG ALPINE_MIRROR=https://dl-cdn.alpinelinux.org/alpine
 ARG BUILD_HASH
+ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org
 
-# Set Node.js options (heap limit Allocation failed - JavaScript heap out of memory)
-# ENV NODE_OPTIONS="--max-old-space-size=4096"
+# This stage only compiles the Web UI. onnxruntime-node otherwise assumes CUDA
+# 12 when nvcc is absent and downloads an unused GPU runtime from GitHub.
+ENV ONNXRUNTIME_NODE_INSTALL_CUDA=skip
 
 WORKDIR /app
 
 # to store git revision in build
-RUN apk add --no-cache git
+RUN set -e; \
+    sed -i "s|https://dl-cdn.alpinelinux.org/alpine|${ALPINE_MIRROR}|g" /etc/apk/repositories; \
+    for attempt in 1 2 3 4 5; do \
+    if apk add --no-cache git; then break; fi; \
+    if [ "$attempt" -eq 5 ]; then exit 1; fi; \
+    echo "apk add failed (attempt $attempt/5); retrying..."; \
+    sleep 2; \
+    done
 
 COPY package.json package-lock.json ./
-RUN npm ci --force
+RUN set -e; \
+    for attempt in 1 2 3 4 5; do \
+    if npm ci --force; then break; fi; \
+    if [ "$attempt" -eq 5 ]; then exit 1; fi; \
+    echo "npm ci failed (attempt $attempt/5); retrying..."; \
+    sleep 2; \
+    done
 
 COPY . .
 ENV APP_BUILD_HASH=${BUILD_HASH}
-RUN npm run build
+ARG NODE_MAX_OLD_SPACE_SIZE=8192
+RUN NODE_OPTIONS="--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}" npm run build
 
 ######## WebUI backend ########
 FROM python:3.11-slim-bookworm AS base
@@ -56,6 +72,13 @@ ARG USE_RERANKING_MODEL
 ARG USE_AUXILIARY_EMBEDDING_MODEL
 ARG UID
 ARG GID
+ARG DEBIAN_MIRROR=http://deb.debian.org
+ARG HF_ENDPOINT=https://huggingface.co
+ARG HF_HUB_DISABLE_XET=false
+ARG PIP_INDEX_URL
+ARG PYTORCH_CPU_INDEX_URL=https://download.pytorch.org/whl/cpu
+ARG TIKTOKEN_TOKENIZER_URL
+ARG UV_INDEX_URL
 
 # Python settings
 ENV PYTHONUNBUFFERED=1
@@ -86,20 +109,20 @@ ENV OPENAI_API_KEY="" \
 #### Other models #########################################################
 ## whisper TTS model settings ##
 ENV WHISPER_MODEL="base" \
-    WHISPER_MODEL_DIR="/app/backend/data/cache/whisper/models"
+    WHISPER_MODEL_DIR="/app/backend/cache-seed/whisper/models"
 
 ## RAG Embedding model settings ##
 ENV RAG_EMBEDDING_MODEL="$USE_EMBEDDING_MODEL_DOCKER" \
     RAG_RERANKING_MODEL="$USE_RERANKING_MODEL_DOCKER" \
     AUXILIARY_EMBEDDING_MODEL="$USE_AUXILIARY_EMBEDDING_MODEL_DOCKER" \
-    SENTENCE_TRANSFORMERS_HOME="/app/backend/data/cache/embedding/models"
+    SENTENCE_TRANSFORMERS_HOME="/app/backend/cache-seed/embedding/models"
 
 ## Tiktoken model settings ##
 ENV TIKTOKEN_ENCODING_NAME="cl100k_base" \
-    TIKTOKEN_CACHE_DIR="/app/backend/data/cache/tiktoken"
+    TIKTOKEN_CACHE_DIR="/app/backend/cache-seed/tiktoken"
 
 ## Hugging Face download cache ##
-ENV HF_HOME="/app/backend/data/cache/embedding/models"
+ENV HF_HOME="/app/backend/cache-seed/embedding/models"
 
 ## Torch Extensions ##
 # ENV TORCH_EXTENSIONS_DIR="/.cache/torch_extensions"
@@ -124,13 +147,22 @@ RUN echo -n 00000000-0000-0000-0000-000000000000 > $HOME/.cache/chroma/telemetry
 RUN chown -R $UID:$GID /app $HOME
 
 # Install common system dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+RUN set -e; \
+    sed -i "s|http://deb.debian.org|${DEBIAN_MIRROR}|g" /etc/apt/sources.list.d/debian.sources; \
+    for attempt in 1 2 3 4 5; do \
+    if apt-get -o Acquire::Retries=5 update && \
+    apt-get -o Acquire::Retries=5 install -y --no-install-recommends \
     git build-essential pandoc gcc netcat-openbsd curl jq ca-certificates \
     libmariadb-dev \
     python3-dev \
-    ffmpeg libsm6 libxext6 zstd \
-    && rm -rf /var/lib/apt/lists/*
+    ffmpeg libsm6 libxext6 zstd; then \
+    break; \
+    fi; \
+    if [ "$attempt" -eq 5 ]; then exit 1; fi; \
+    echo "apt-get install failed (attempt $attempt/5); retrying..."; \
+    sleep 2; \
+    done; \
+    rm -rf /var/lib/apt/lists/*
 
 # install python dependencies
 COPY --chown=$UID:$GID ./backend/requirements.txt ./requirements.txt
@@ -139,30 +171,54 @@ COPY --chown=$UID:$GID ./backend/requirements.txt ./requirements.txt
 ENV UV_LINK_MODE=copy
 
 RUN set -e; \
-    pip3 install --no-cache-dir uv; \
+    retry() { \
+    attempt=1; \
+    until "$@"; do \
+    if [ "$attempt" -ge 5 ]; then return 1; fi; \
+    echo "command failed (attempt $attempt/5); retrying..."; \
+    attempt=$((attempt + 1)); \
+    sleep 2; \
+    done; \
+    }; \
+    prepare_tiktoken_cache() { \
+    if [ -z "${TIKTOKEN_TOKENIZER_URL}" ]; then return 0; fi; \
+    retry curl --fail --location --show-error --silent "${TIKTOKEN_TOKENIZER_URL}" -o /tmp/cl100k-tokenizer.json; \
+    python -c 'import base64,hashlib,json,os; vocab=json.load(open("/tmp/cl100k-tokenizer.json"))["model"]["vocab"]; visible=list(range(ord("!"),ord("~")+1))+list(range(ord("¡"),ord("¬")+1))+list(range(ord("®"),ord("ÿ")+1)); missing=[b for b in range(256) if b not in visible]; decoder={chr(c):b for b,c in zip(visible+missing,visible+[256+i for i in range(len(missing))])}; rows=sorted((rank,bytes(decoder[ch] for ch in token)) for token,rank in vocab.items() if rank < 100256); data=b"".join(base64.b64encode(token)+b" "+str(rank).encode()+b"\n" for rank,token in rows); expected="223921b76ee99bde995b7ff738513eef100fb51d18c93597a113bcffe865b2a7"; assert len(rows)==100256 and hashlib.sha256(data).hexdigest()==expected; cache=os.environ["TIKTOKEN_CACHE_DIR"]; os.makedirs(cache,exist_ok=True); open(os.path.join(cache,"9b5ad71b2ce5302211f9c61530b329a4922fc6a4"),"wb").write(data)'; \
+    rm -f /tmp/cl100k-tokenizer.json; \
+    }; \
+    retry pip3 install --no-cache-dir uv; \
     if [ "$USE_CUDA" = "true" ]; then \
     # If you use CUDA the whisper and embedding model will be downloaded on first use
     # fix: pin torch<=2.9.1 - torch 2.10.0 aarch64 wheels cause SIGILL on ARM devices (RPi 4 Cortex-A72) #21349
-    pip3 install 'torch<=2.9.1' torchvision torchaudio --index-url https://download.pytorch.org/whl/$USE_CUDA_DOCKER_VER --no-cache-dir; \
-    uv pip install --system -r requirements.txt --no-cache-dir; \
-    python -c "import os; from sentence_transformers import SentenceTransformer; SentenceTransformer(os.environ['RAG_EMBEDDING_MODEL'], device='cpu')"; \
-    python -c "import os; from sentence_transformers import SentenceTransformer; SentenceTransformer(os.environ.get('AUXILIARY_EMBEDDING_MODEL', 'TaylorAI/bge-micro-v2'), device='cpu')"; \
-    python -c "import os; from faster_whisper import WhisperModel; WhisperModel(os.environ['WHISPER_MODEL'], device='cpu', compute_type='int8', download_root=os.environ['WHISPER_MODEL_DIR'])"; \
-    python -c "import os; import tiktoken; tiktoken.get_encoding(os.environ['TIKTOKEN_ENCODING_NAME'])"; \
-    python -c "import nltk; nltk.download('punkt_tab')"; \
+    retry pip3 install 'torch<=2.9.1' torchvision torchaudio --index-url https://download.pytorch.org/whl/$USE_CUDA_DOCKER_VER --no-cache-dir; \
+    retry uv pip install --system -r requirements.txt --no-cache-dir; \
+    prepare_tiktoken_cache; \
+    retry python -c "import os; from sentence_transformers import SentenceTransformer; SentenceTransformer(os.environ['RAG_EMBEDDING_MODEL'], device='cpu')"; \
+    retry python -c "import os; from sentence_transformers import SentenceTransformer; SentenceTransformer(os.environ.get('AUXILIARY_EMBEDDING_MODEL', 'TaylorAI/bge-micro-v2'), device='cpu')"; \
+    retry python -c "import os; from faster_whisper import WhisperModel; WhisperModel(os.environ['WHISPER_MODEL'], device='cpu', compute_type='int8', download_root=os.environ['WHISPER_MODEL_DIR'])"; \
+    retry python -c "import os; import tiktoken; tiktoken.get_encoding(os.environ['TIKTOKEN_ENCODING_NAME'])"; \
+    retry python -c "import nltk; nltk.download('punkt_tab')"; \
     else \
-    pip3 install 'torch<=2.9.1' torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu --no-cache-dir; \
-    uv pip install --system -r requirements.txt --no-cache-dir; \
+    retry pip3 install 'torch<=2.9.1' torchvision torchaudio --index-url "${PYTORCH_CPU_INDEX_URL}" --no-cache-dir; \
+    retry uv pip install --system -r requirements.txt --no-cache-dir; \
+    prepare_tiktoken_cache; \
     if [ "$USE_SLIM" != "true" ]; then \
-    python -c "import os; from sentence_transformers import SentenceTransformer; SentenceTransformer(os.environ['RAG_EMBEDDING_MODEL'], device='cpu')"; \
-    python -c "import os; from sentence_transformers import SentenceTransformer; SentenceTransformer(os.environ.get('AUXILIARY_EMBEDDING_MODEL', 'TaylorAI/bge-micro-v2'), device='cpu')"; \
-    python -c "import os; from faster_whisper import WhisperModel; WhisperModel(os.environ['WHISPER_MODEL'], device='cpu', compute_type='int8', download_root=os.environ['WHISPER_MODEL_DIR'])"; \
-    python -c "import os; import tiktoken; tiktoken.get_encoding(os.environ['TIKTOKEN_ENCODING_NAME'])"; \
-    python -c "import nltk; nltk.download('punkt_tab')"; \
+    retry python -c "import os; from sentence_transformers import SentenceTransformer; SentenceTransformer(os.environ['RAG_EMBEDDING_MODEL'], device='cpu')"; \
+    retry python -c "import os; from sentence_transformers import SentenceTransformer; SentenceTransformer(os.environ.get('AUXILIARY_EMBEDDING_MODEL', 'TaylorAI/bge-micro-v2'), device='cpu')"; \
+    retry python -c "import os; from faster_whisper import WhisperModel; WhisperModel(os.environ['WHISPER_MODEL'], device='cpu', compute_type='int8', download_root=os.environ['WHISPER_MODEL_DIR'])"; \
+    retry python -c "import os; import tiktoken; tiktoken.get_encoding(os.environ['TIKTOKEN_ENCODING_NAME'])"; \
+    retry python -c "import nltk; nltk.download('punkt_tab')"; \
     fi; \
     fi; \
     mkdir -p /app/backend/data; chown -R $UID:$GID /app/backend/data/; \
     rm -rf /var/lib/apt/lists/*;
+
+# Runtime caches live in persistent DATA_DIR. start.sh seeds missing entries
+# from the image cache above when a bind mount starts empty.
+ENV WHISPER_MODEL_DIR="/app/backend/data/cache/whisper/models" \
+    SENTENCE_TRANSFORMERS_HOME="/app/backend/data/cache/embedding/models" \
+    TIKTOKEN_CACHE_DIR="/app/backend/data/cache/tiktoken" \
+    HF_HOME="/app/backend/data/cache/embedding/models"
 
 # Install Ollama if requested
 RUN if [ "$USE_OLLAMA" = "true" ]; then \

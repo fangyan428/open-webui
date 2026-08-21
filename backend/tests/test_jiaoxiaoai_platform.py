@@ -7,7 +7,7 @@ from open_webui.utils.access_control.model_knowledge import (
     MODEL_RAG_ONLY_KEY,
     resolve_model_knowledge_for_inference,
 )
-from open_webui.utils.jiaoxiaoai import seed_jiaoxiaoai_model
+from open_webui.utils.jiaoxiaoai import apply_jiaoxiaoai_managed_policy, seed_jiaoxiaoai_model
 
 
 def student() -> UserModel:
@@ -122,6 +122,56 @@ async def test_declarative_model_bootstrap_does_not_overwrite_existing_model(mon
 
     assert await seed_jiaoxiaoai_model() is False
     insert.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_managed_policy_restores_defaults_without_overwriting_admin_model_fields(monkeypatch):
+    monkeypatch.setenv('JIAOXIAOAI_MANAGED_MODE', 'true')
+    model = SimpleNamespace(
+        id='jiaoxiaoai',
+        base_model_id='admin-selected-model',
+        name='管理员改过的名字',
+        meta=SimpleNamespace(
+            model_dump=lambda **_: {
+                'description': 'kept',
+                'capabilities': {'vision': True},
+                'defaultFeatureIds': ['image_generation'],
+            }
+        ),
+        params=SimpleNamespace(model_dump=lambda **_: {'temperature': 0.2}),
+        access_grants=[],
+        is_active=True,
+    )
+    monkeypatch.setattr('open_webui.utils.jiaoxiaoai.Config.upsert', AsyncMock())
+    monkeypatch.setattr('open_webui.utils.jiaoxiaoai.Config.get', AsyncMock(return_value=''))
+    monkeypatch.setattr('open_webui.utils.jiaoxiaoai.Models.get_model_by_id', AsyncMock(return_value=model))
+    update = AsyncMock(return_value=model)
+    monkeypatch.setattr('open_webui.utils.jiaoxiaoai.Models.update_model_by_id', update)
+
+    assert await apply_jiaoxiaoai_managed_policy() is True
+    form = update.await_args.args[1]
+    assert form.base_model_id == 'admin-selected-model'
+    assert form.name == '管理员改过的名字'
+    assert form.params.model_dump()['temperature'] == 0.2
+    assert form.meta.model_dump()['description'] == 'kept'
+    assert form.meta.model_dump()['capabilities']['vision'] is True
+    assert form.meta.model_dump()['capabilities']['web_search'] is True
+    assert 'web_search' in form.meta.model_dump()['defaultFeatureIds']
+
+
+def test_managed_student_cannot_call_provider_routes_directly(monkeypatch):
+    from open_webui.utils.jiaoxiaoai import provider_route_allowed
+
+    monkeypatch.setenv('JIAOXIAOAI_MANAGED_MODE', 'true')
+    assert provider_route_allowed('user') is False
+    assert provider_route_allowed('admin') is True
+
+
+def test_provider_routes_keep_upstream_behavior_outside_managed_mode(monkeypatch):
+    from open_webui.utils.jiaoxiaoai import provider_route_allowed
+
+    monkeypatch.delenv('JIAOXIAOAI_MANAGED_MODE', raising=False)
+    assert provider_route_allowed('user') is True
 
 
 @pytest.mark.parametrize(

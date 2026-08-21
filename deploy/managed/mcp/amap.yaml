@@ -1,0 +1,17 @@
+url: https://mcp.amap.com/mcp?key=${AMAP_MCP_KEY}
+path: ''
+type: mcp
+auth_type: none
+headers: {}
+key: ''
+config:
+  enable: true
+  function_name_filter_list: maps_regeocode,maps_geo,maps_weather,maps_bicycling,maps_direction_walking,maps_direction_driving,maps_direction_transit_integrated,maps_distance,maps_text_search,maps_around_search,maps_search_detail
+  access_grants:
+    - principal_type: user
+      principal_id: '*'
+      permission: read
+info:
+  id: amap
+  name: 高德地图
+  description: 高德官方地图、POI、天气与路线查询（只读）

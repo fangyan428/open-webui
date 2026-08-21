@@ -718,6 +718,12 @@ async def update_file_data_content_by_id(
             detail=ERROR_MESSAGES.NOT_FOUND,
         )
 
+    if ((file.meta or {}).get('data') or {}).get('jiaoxiaoai_managed'):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail='This file is managed from the server directory; change it there and synchronize again.',
+        )
+
     if file.user_id == user.id or user.role == 'admin' or await has_access_to_file(id, 'write', user, db=db):
         max_size = await Config.get('rag.file.max_size')
         if max_size and len(form_data.content.encode('utf-8')) > int(max_size) * 1024 * 1024:
@@ -969,6 +975,12 @@ async def rename_file_by_id(
             detail=ERROR_MESSAGES.NOT_FOUND,
         )
 
+    if ((file.meta or {}).get('data') or {}).get('jiaoxiaoai_managed'):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail='This file is managed from the server directory; change it there and synchronize again.',
+        )
+
     if file.user_id == user.id or user.role == 'admin' or await has_access_to_file(id, 'write', user, db=db):
         result = await Files.update_file_name_by_id(id, form_data.filename, db=db)
         if result:
@@ -1007,6 +1019,12 @@ async def delete_file_by_id(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=ERROR_MESSAGES.NOT_FOUND,
+        )
+
+    if ((file.meta or {}).get('data') or {}).get('jiaoxiaoai_managed'):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail='This file is managed from the server directory; change it there and synchronize again.',
         )
 
     if file.user_id == user.id or user.role == 'admin' or await has_access_to_file(id, 'write', user, db=db):

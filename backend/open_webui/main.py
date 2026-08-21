@@ -231,7 +231,12 @@ from open_webui.utils.chat_variables import (
     normalize_chat_variables,
 )
 from open_webui.utils.embeddings import generate_embeddings
-from open_webui.utils.jiaoxiaoai import seed_jiaoxiaoai_model
+from open_webui.utils.jiaoxiaoai import (
+    apply_jiaoxiaoai_managed_policy,
+    managed_mode_enabled,
+    managed_model_id,
+    seed_jiaoxiaoai_model,
+)
 from open_webui.utils.json_response import apply_orjson_http_json
 from open_webui.utils.logger import start_logger
 from open_webui.utils.middleware import (
@@ -354,6 +359,30 @@ async def lifespan(app: FastAPI):
         if await create_admin_user(WEBUI_ADMIN_EMAIL, WEBUI_ADMIN_PASSWORD, WEBUI_ADMIN_NAME):
             # Disable signup since we now have an admin
             await Config.upsert({'ui.enable_signup': False})
+
+    # Managed deployments intentionally keep test sign-up enabled and make new
+    # accounts immediately usable, including after the bootstrap Admin exists.
+    await apply_jiaoxiaoai_managed_policy()
+
+    if managed_mode_enabled():
+        try:
+            from open_webui.utils.jiaoxiaoai_knowledge import sync_managed_knowledge
+
+            knowledge_sync = await sync_managed_knowledge(app)
+            if knowledge_sync['errors']:
+                log.warning('Managed Knowledge startup sync completed with errors: %s', knowledge_sync['errors'])
+        except Exception as exc:
+            # A damaged seed directory must not prevent chat, native Admin
+            # uploads, or a later manual retry from working.
+            log.exception('Managed Knowledge startup sync failed: %s', exc)
+        try:
+            from open_webui.utils.jiaoxiaoai_mcp import sync_managed_mcp
+
+            mcp_sync = await sync_managed_mcp()
+            if mcp_sync['errors']:
+                log.warning('Managed MCP startup sync completed with errors: %s', mcp_sync['errors'])
+        except Exception as exc:
+            log.exception('Managed MCP startup sync failed: %s', exc)
 
     if SAFE_MODE:
         await Functions.deactivate_all_functions()
@@ -786,8 +815,25 @@ app.add_middleware(
 app.mount('/ws', socket_app)
 
 
-app.include_router(ollama.router, prefix='/ollama', tags=['ollama'])
-app.include_router(openai.router, prefix='/openai', tags=['openai'])
+async def require_provider_route_access(user=Depends(get_verified_user)):
+    from open_webui.utils.jiaoxiaoai import provider_route_allowed
+
+    if not provider_route_allowed(user.role):
+        raise HTTPException(status_code=403, detail='Direct provider access is not available')
+
+
+app.include_router(
+    ollama.router,
+    prefix='/ollama',
+    tags=['ollama'],
+    dependencies=[Depends(require_provider_route_access)],
+)
+app.include_router(
+    openai.router,
+    prefix='/openai',
+    tags=['openai'],
+    dependencies=[Depends(require_provider_route_access)],
+)
 
 
 app.include_router(pipelines.router, prefix='/api/v1/pipelines', tags=['pipelines'])
@@ -858,6 +904,9 @@ async def get_models(request: Request, refresh: bool = False, user=Depends(get_v
     # models the caller can actually see.
     models = await get_filtered_models(models, user)
 
+    if managed_mode_enabled() and user.role != 'admin':
+        models = [model for model in models if model.get('id') == managed_model_id()]
+
     # Never mutate the shared model cache while shaping a user-specific response.
     models = copy.deepcopy(models)
 
@@ -903,6 +952,20 @@ async def get_models(request: Request, refresh: bool = False, user=Depends(get_v
 async def get_base_models(request: Request, user=Depends(get_admin_user)):
     models = await get_all_base_models(request, user=user)
     return {'data': models}
+
+
+@app.post('/api/v1/jiaoxiaoai/knowledge/sync')
+async def sync_jiaoxiaoai_knowledge(request: Request, user=Depends(get_admin_user)):
+    from open_webui.utils.jiaoxiaoai_knowledge import sync_managed_knowledge
+
+    return await sync_managed_knowledge(request.app)
+
+
+@app.post('/api/v1/jiaoxiaoai/mcp/sync')
+async def sync_jiaoxiaoai_mcp(request: Request, user=Depends(get_admin_user)):
+    from open_webui.utils.jiaoxiaoai_mcp import sync_managed_mcp
+
+    return await sync_managed_mcp(request)
 
 
 class ModelUnloadForm(BaseModel):
@@ -1043,6 +1106,9 @@ async def embeddings(request: Request, form_data: dict, user=Depends(get_verifie
     Returns:
         dict: OpenAI-compatible embeddings response.
     """
+    if managed_mode_enabled() and user.role != 'admin':
+        raise HTTPException(status_code=403, detail='Direct embedding access is not available')
+
     # Make sure models are loaded in app state
     if not request.app.state.MODELS:
         await get_all_models(request, user=user)
@@ -1072,7 +1138,12 @@ async def chat_completion(
         await get_all_models(request, user=user)
 
     model_id = form_data.get('model', None)
+
+    if managed_mode_enabled() and user.role != 'admin' and model_id != managed_model_id():
+        raise HTTPException(status_code=403, detail='Only the managed 交小AI model is available')
     model_item = form_data.pop('model_item', {})
+    if managed_mode_enabled() and user.role != 'admin' and model_item.get('direct', False):
+        raise HTTPException(status_code=403, detail='Direct model connections are not available')
     tasks = form_data.pop('background_tasks', None)
 
     metadata = {}
@@ -1923,6 +1994,8 @@ async def generate_messages(
     Anthropic's x-api-key header (via middleware translation).
     """
     requested_model = form_data.get('model', '')
+    if managed_mode_enabled() and user.role != 'admin' and requested_model != managed_model_id():
+        raise HTTPException(status_code=403, detail='Only the managed 交小AI model is available')
     input_tokens = None
     try:
         input_tokens = await openai.count_anthropic_tokens(request, form_data, user)
@@ -2199,6 +2272,7 @@ async def get_app_config(request: Request):
             **(
                 {
                     'enable_api_keys': config.get('auth.enable_api_keys'),
+                    'jiaoxiaoai_managed_mode': managed_mode_enabled(),
                     'enable_password_change_form': config.get('ui.enable_password_change_form'),
                     'enable_version_update_check': ENABLE_VERSION_UPDATE_CHECK,
                     'enable_pyodide_file_persistence': ENABLE_PYODIDE_FILE_PERSISTENCE,

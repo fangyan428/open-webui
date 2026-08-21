@@ -1,5 +1,27 @@
 services:
+  ollama:
+    profiles:
+      - ollama
+
   open-webui:
+    container_name: jiaoxiaoai
+    build:
+      network: ${JIAOXIAOAI_BUILD_NETWORK-default}
+      args:
+        ALPINE_MIRROR: ${JIAOXIAOAI_ALPINE_MIRROR-https://dl-cdn.alpinelinux.org/alpine}
+        HTTP_PROXY: ${JIAOXIAOAI_BUILD_PROXY-}
+        HTTPS_PROXY: ${JIAOXIAOAI_BUILD_PROXY-}
+        NO_PROXY: ${JIAOXIAOAI_BUILD_NO_PROXY-localhost,127.0.0.1,::1}
+        DEBIAN_MIRROR: ${JIAOXIAOAI_DEBIAN_MIRROR-http://deb.debian.org}
+        HF_ENDPOINT: ${JIAOXIAOAI_HF_ENDPOINT-https://huggingface.co}
+        HF_HUB_DISABLE_XET: ${JIAOXIAOAI_HF_HUB_DISABLE_XET-false}
+        NPM_CONFIG_REGISTRY: ${JIAOXIAOAI_NPM_REGISTRY-https://registry.npmjs.org}
+        NODE_MAX_OLD_SPACE_SIZE: ${JIAOXIAOAI_NODE_MAX_OLD_SPACE_SIZE-8192}
+        PIP_INDEX_URL: ${JIAOXIAOAI_PYPI_INDEX_URL-https://pypi.org/simple}
+        PYTORCH_CPU_INDEX_URL: ${JIAOXIAOAI_PYTORCH_CPU_INDEX_URL-https://download.pytorch.org/whl/cpu}
+        TIKTOKEN_TOKENIZER_URL: ${JIAOXIAOAI_TIKTOKEN_TOKENIZER_URL-}
+        UV_INDEX_URL: ${JIAOXIAOAI_PYPI_INDEX_URL-https://pypi.org/simple}
+    depends_on: !reset []
     env_file:
       - ./deploy/jiaoxiaoai.env
     environment: !reset []
@@ -7,3 +29,4 @@ services:
       - "3001:8080"
     volumes: !override
       - ./.cptr/jiaoxiaoai-data:/app/backend/data
+      - ./deploy/managed:/app/managed:ro

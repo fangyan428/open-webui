@@ -229,6 +229,36 @@ class KnowledgeTable:
             except Exception:
                 return None
 
+    async def insert_managed_knowledge(
+        self,
+        knowledge_id: str,
+        user_id: str,
+        form_data: KnowledgeForm,
+        meta: Optional[dict] = None,
+        db: Optional[AsyncSession] = None,
+    ) -> Optional[KnowledgeModel]:
+        """Insert a declaratively managed Knowledge base with a stable ID."""
+        async with get_async_db_context(db) as db:
+            now = int(time.time())
+            try:
+                result = Knowledge(
+                    id=knowledge_id,
+                    user_id=user_id,
+                    name=form_data.name,
+                    description=form_data.description,
+                    meta=meta or {},
+                    created_at=now,
+                    updated_at=now,
+                )
+                db.add(result)
+                await db.commit()
+                await db.refresh(result)
+                await AccessGrants.set_access_grants('knowledge', result.id, form_data.access_grants, db=db)
+                return await self._to_knowledge_model(result, db=db)
+            except Exception:
+                log.exception('Failed to insert managed knowledge %s', knowledge_id)
+                return None
+
     async def get_knowledge_bases(
         self, skip: int = 0, limit: int = 30, db: Optional[AsyncSession] = None
     ) -> list[KnowledgeUserModel]:

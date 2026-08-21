@@ -16,6 +16,16 @@ set -euo pipefail
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 cd "$SCRIPT_DIR" || exit 1
 
+# A host bind mount on DATA_DIR hides files baked into that image path. Seed
+# only missing cache entries so model downloads survive container recreation
+# and administrator-selected runtime caches are never overwritten.
+CACHE_SEED_DIR="${MODEL_CACHE_SEED_DIR:-/app/backend/cache-seed}"
+DATA_CACHE_DIR="${DATA_DIR:-/app/backend/data}/cache"
+if [[ -d "$CACHE_SEED_DIR" ]]; then
+  mkdir -p "$DATA_CACHE_DIR"
+  cp -a -n "$CACHE_SEED_DIR"/. "$DATA_CACHE_DIR"/
+fi
+
 # ── Playwright browser installation (if configured) ──────────────────────────
 
 if [[ "${WEB_LOADER_ENGINE,,}" == "playwright" ]]; then

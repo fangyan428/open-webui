@@ -784,7 +784,19 @@
 			return true;
 		});
 
-		return $user?.role === 'admin' ? [...personalSettings, ...adminSettings] : personalSettings;
+		if ($user?.role !== 'admin') return personalSettings;
+		if ($config?.features?.jiaoxiaoai_managed_mode) {
+			const managedAdminTabs = new Set([
+				'admin:connections',
+				'admin:models',
+				'admin:analytics',
+				'admin:integrations',
+				'admin:documents',
+				'admin:web'
+			]);
+			return [...personalSettings, ...adminSettings.filter((tab) => managedAdminTabs.has(tab.id))];
+		}
+		return [...personalSettings, ...adminSettings];
 	};
 
 	const setFilteredSettings = () => {

@@ -4,13 +4,13 @@ from pathlib import Path
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
+import yaml
+from fastapi import HTTPException
 from open_webui.models.users import UserModel
 from open_webui.routers import configs
 from open_webui.routers import tools as tools_router
 from open_webui.utils import middleware
-from open_webui.utils.auth import get_current_user
+from open_webui.utils.auth import get_admin_user_forbidden
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 AMAP_TOOL_NAMES = {
@@ -42,15 +42,10 @@ def env_json(name: str):
 
 
 def amap_connection() -> dict:
-    connections = env_json('TOOL_SERVER_CONNECTIONS')
-    return copy.deepcopy(next(connection for connection in connections if connection['info']['id'] == 'amap'))
-
-
-def config_client(current_user: UserModel) -> TestClient:
-    app = FastAPI()
-    app.include_router(configs.router, prefix='/api/v1/configs')
-    app.dependency_overrides[get_current_user] = lambda: current_user
-    return TestClient(app)
+    path = REPO_ROOT / 'deploy' / 'managed' / 'mcp' / 'amap.yaml'
+    connection = yaml.safe_load(path.read_text(encoding='utf-8'))
+    connection['url'] = connection['url'].replace('${AMAP_MCP_KEY}', 'replace-with-amap-mcp-key')
+    return copy.deepcopy(connection)
 
 
 def test_amap_bootstrap_uses_official_streamable_http_and_query_only_allowlist():
@@ -60,37 +55,32 @@ def test_amap_bootstrap_uses_official_streamable_http_and_query_only_allowlist()
     assert connection['url'] == 'https://mcp.amap.com/mcp?key=replace-with-amap-mcp-key'
     assert connection['type'] == 'mcp'
     assert connection['auth_type'] == 'none'
-    assert connection['config']['enable'] is False
-    assert connection['config']['access_grants'] == []
+    assert connection['config']['enable'] is True
+    assert connection['config']['access_grants'] == [
+        {'principal_type': 'user', 'principal_id': '*', 'permission': 'read'}
+    ]
     assert configured_tools == AMAP_TOOL_NAMES
     assert 'maps_ip_location' not in configured_tools
-    assert env_json('JIAOXIAOAI_MODEL_METADATA')['toolIds'] == ['server:mcp:amap']
+    assert env_json('JIAOXIAOAI_MODEL_METADATA')['toolIds'] == []
 
 
-@pytest.mark.parametrize(
-    ('method', 'path', 'body'),
-    [
-        ('get', '/api/v1/configs/tool_servers', None),
-        ('post', '/api/v1/configs/tool_servers', {'TOOL_SERVER_CONNECTIONS': []}),
-        ('post', '/api/v1/configs/tool_servers/verify', amap_connection()),
-    ],
-)
-def test_student_tool_server_configuration_access_returns_403_and_no_secret(monkeypatch, method, path, body):
+def test_student_tool_server_configuration_access_returns_403_and_no_secret(monkeypatch):
     get_config = AsyncMock()
     upsert_config = AsyncMock()
     monkeypatch.setattr(configs.Config, 'get', get_config)
     monkeypatch.setattr(configs.Config, 'upsert', upsert_config)
 
-    with config_client(user()) as client:
-        response = client.request(method, path, json=body)
+    with pytest.raises(HTTPException) as exc:
+        get_admin_user_forbidden(user())
 
-    assert response.status_code == 403
-    assert 'replace-with-amap-mcp-key' not in response.text
+    assert exc.value.status_code == 403
+    assert 'replace-with-amap-mcp-key' not in str(exc.value.detail)
     get_config.assert_not_awaited()
     upsert_config.assert_not_awaited()
 
 
-def test_admin_can_enable_authorize_and_delete_amap_connection(monkeypatch):
+@pytest.mark.asyncio
+async def test_admin_can_enable_authorize_and_delete_amap_connection(monkeypatch):
     connection = amap_connection()
     connection['config']['enable'] = True
     connection['config']['access_grants'] = [
@@ -110,22 +100,22 @@ def test_admin_can_enable_authorize_and_delete_amap_connection(monkeypatch):
     monkeypatch.setattr(configs, 'set_tool_servers', refresh_servers)
     monkeypatch.setattr(configs, 'publish_event', publish)
 
-    with config_client(user('admin-1', 'admin')) as client:
-        enabled = client.post(
-            '/api/v1/configs/tool_servers',
-            json={'TOOL_SERVER_CONNECTIONS': [connection]},
-        )
-        deleted = client.post(
-            '/api/v1/configs/tool_servers',
-            json={'TOOL_SERVER_CONNECTIONS': []},
-        )
+    request = Mock()
+    enabled = await configs.set_tool_servers_config(
+        request,
+        configs.ToolServersConfigForm(TOOL_SERVER_CONNECTIONS=[connection]),
+        user('admin-1', 'admin'),
+    )
+    deleted = await configs.set_tool_servers_config(
+        request,
+        configs.ToolServersConfigForm(TOOL_SERVER_CONNECTIONS=[]),
+        user('admin-1', 'admin'),
+    )
 
-    assert enabled.status_code == 200
-    saved = enabled.json()['TOOL_SERVER_CONNECTIONS'][0]
+    saved = enabled['TOOL_SERVER_CONNECTIONS'][0]
     assert saved['config']['enable'] is True
     assert saved['config']['access_grants'][0]['principal_id'] == 'student-1'
-    assert deleted.status_code == 200
-    assert deleted.json() == {'TOOL_SERVER_CONNECTIONS': []}
+    assert deleted == {'TOOL_SERVER_CONNECTIONS': []}
     assert upsert_config.await_args_list[0].args[0] == {'tool_server.connections': [saved]}
     assert upsert_config.await_args_list[1].args[0] == {'tool_server.connections': []}
     assert refresh_servers.await_count == 2

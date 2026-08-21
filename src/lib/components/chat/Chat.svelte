@@ -3121,6 +3121,13 @@
 		const useChatVariablesFallback =
 			!_chatId || $temporaryChatEnabled || isTemporaryChatId(_chatId);
 
+		const requestFeatures = getFeatures();
+		if ($config?.features?.jiaoxiaoai_managed_mode && !webSearchEnabled) {
+			// In managed mode the switch is a one-message opt-out, not a saved
+			// preference. The request keeps the captured false value.
+			webSearchEnabled = true;
+		}
+
 		const res = await generateOpenAIChatCompletion(
 			localStorage.token,
 			{
@@ -3146,7 +3153,7 @@
 					// Direct terminal servers — always included when enabled (not routed through selectedToolIds)
 					...($terminalServers ?? []).filter((t) => !t.id)
 				],
-				features: getFeatures(),
+				features: requestFeatures,
 				variables: {
 					...getPromptVariables(
 						$user?.name,

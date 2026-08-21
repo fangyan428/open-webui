@@ -1232,6 +1232,13 @@ async def update_admin_config(request: Request, form_data: AdminConfig, user=Dep
     if form_data.CHANNEL_MODEL_RESPONSE_MODE not in ['thread', 'channel']:
         updates.pop('channels.model_response_mode', None)
 
+    from open_webui.utils.jiaoxiaoai import managed_mode_enabled
+
+    if managed_mode_enabled():
+        updates['ui.enable_signup'] = True
+        updates['ui.default_user_role'] = 'user'
+        updates['auth.enable_api_keys'] = False
+
     pattern = r'^(-1|0|(-?\d+(\.\d+)?)(ms|s|m|h|d|w))$'
 
     # Check if the input string matches the pattern

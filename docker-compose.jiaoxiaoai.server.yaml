@@ -1,0 +1,16 @@
+name: jiaoxiaoai
+
+services:
+  open-webui:
+    image: ${JIAOXIAOAI_IMAGE:?Set JIAOXIAOAI_IMAGE to the published image}
+    container_name: jiaoxiaoai
+    restart: unless-stopped
+    env_file:
+      - ./deploy/jiaoxiaoai.env
+    ports:
+      - "${JIAOXIAOAI_LISTEN_ADDR-127.0.0.1}:${JIAOXIAOAI_PORT-3001}:8080"
+    volumes:
+      - ./.cptr/jiaoxiaoai-data:/app/backend/data
+      - ./deploy/managed:/app/managed:ro
+    extra_hosts:
+      - host.docker.internal:host-gateway

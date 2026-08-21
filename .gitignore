@@ -8,6 +8,10 @@ node_modules
 .env
 .env.*
 /deploy/jiaoxiaoai.env
+# Managed Knowledge content stays on the deployment host. Commit manifests and
+# directory scaffolding, not institutional documents or generated RAG sources.
+/deploy/managed/knowledge/**/files/**
+!/deploy/managed/knowledge/**/files/.gitkeep
 !.env.example
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*

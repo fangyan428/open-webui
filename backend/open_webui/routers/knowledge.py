@@ -120,6 +120,14 @@ def is_external_knowledge(knowledge) -> bool:
     return (knowledge.meta or {}).get('source') == 'external'
 
 
+def managed_knowledge_error(knowledge) -> None:
+    if (knowledge.meta or {}).get('jiaoxiaoai_managed'):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail='This Knowledge base is managed from the server directory.',
+        )
+
+
 def external_knowledge_error():
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
@@ -1107,6 +1115,7 @@ async def update_knowledge_by_id(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=ERROR_MESSAGES.NOT_FOUND,
         )
+    managed_knowledge_error(knowledge)
     # Is the user the original creator, in a group with write access, or an admin
     if (
         knowledge.user_id != user.id
@@ -1182,6 +1191,7 @@ async def update_knowledge_access_by_id(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=ERROR_MESSAGES.NOT_FOUND,
         )
+    managed_knowledge_error(knowledge)
 
     if (
         knowledge.user_id != user.id
@@ -1504,6 +1514,12 @@ async def update_file_from_knowledge_by_id(
             detail=ERROR_MESSAGES.NOT_FOUND,
         )
 
+    if ((file.meta or {}).get('data') or {}).get('jiaoxiaoai_managed'):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail='This file is managed from the server directory; change it there and synchronize again.',
+        )
+
     # Validate the file actually belongs to this knowledge base
     if not await Knowledges.has_file(knowledge_id=id, file_id=form_data.file_id, db=db):
         raise HTTPException(
@@ -1594,6 +1610,12 @@ async def remove_file_from_knowledge_by_id(
             detail=ERROR_MESSAGES.NOT_FOUND,
         )
 
+    if ((file.meta or {}).get('data') or {}).get('jiaoxiaoai_managed'):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail='This file is managed from the server directory; change it there and synchronize again.',
+        )
+
     # Validate the file actually belongs to this knowledge base
     if not await Knowledges.has_file(knowledge_id=id, file_id=form_data.file_id, db=db):
         raise HTTPException(
@@ -1670,6 +1692,7 @@ async def delete_knowledge_by_id(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=ERROR_MESSAGES.NOT_FOUND,
         )
+    managed_knowledge_error(knowledge)
 
     if (
         knowledge.user_id != user.id
@@ -1756,6 +1779,7 @@ async def reset_knowledge_by_id(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=ERROR_MESSAGES.NOT_FOUND,
         )
+    managed_knowledge_error(knowledge)
     if is_external_knowledge(knowledge):
         external_knowledge_error()
 
@@ -1830,7 +1854,8 @@ async def sync_knowledge_diff(
     Compare a local file manifest against the knowledge base to determine
     which files need uploading, removing, and which directories to create/remove.
     """
-    await _verify_knowledge_write_access(id, user, db)
+    knowledge = await _verify_knowledge_write_access(id, user, db)
+    managed_knowledge_error(knowledge)
 
     # ── Index existing state ──
     knowledge_files = await Knowledges.get_files_with_directory_ids(id, db=db)
@@ -1935,7 +1960,8 @@ async def sync_knowledge_cleanup(
     Remove stale files and orphaned directories from a knowledge base
     after an incremental sync.
     """
-    await _verify_knowledge_write_access(id, user, db)
+    knowledge = await _verify_knowledge_write_access(id, user, db)
+    managed_knowledge_error(knowledge)
 
     # ── Remove deleted files ──
     for file_id in form_data.file_ids:
