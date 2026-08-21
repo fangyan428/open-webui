@@ -12,7 +12,12 @@
 
 	import { get, type Unsubscriber, type Writable } from 'svelte/store';
 	import type { i18n as i18nType } from 'i18next';
-	import { WEBUI_BASE_URL } from '$lib/constants';
+	import {
+		JIAOXIAOAI_LOGIN_SUGGESTION_PROMPTS,
+		type JiaoxiaoaiPromptSuggestion,
+		WEBUI_BASE_URL
+	} from '$lib/constants';
+	import { consumeJiaoxiaoaiLoginSuggestions } from '$lib/utils/jiaoxiaoaiLoginSuggestions';
 	import equal from 'fast-deep-equal';
 
 	import {
@@ -138,6 +143,7 @@
 		null;
 
 	let loading = true;
+	let loginSuggestionPrompts: JiaoxiaoaiPromptSuggestion[] | null = null;
 	$: chatContainerId = embedded ? 'note-chat-container' : 'chat-container';
 	$: messageInputDropzoneId = embedded ? 'note-chat-input-dropzone' : 'chat-pane';
 
@@ -1274,7 +1280,19 @@
 	onMount(() => {
 		loading = true;
 		console.log('mounted');
+		if (
+			!embedded &&
+			$page.url.pathname === '/' &&
+			$config?.features?.jiaoxiaoai_managed_mode &&
+			consumeJiaoxiaoaiLoginSuggestions(sessionStorage)
+		) {
+			loginSuggestionPrompts = JIAOXIAOAI_LOGIN_SUGGESTION_PROMPTS;
+		}
 		window.addEventListener('message', onMessageHandler);
+		const clearLoginSuggestions = () => {
+			loginSuggestionPrompts = null;
+		};
+		window.addEventListener('open-webui:new-chat', clearLoginSuggestions);
 		$socket?.on('events', chatEventHandler);
 		$socket?.on('connect', handleSocketConnect);
 
@@ -1297,7 +1315,9 @@
 		const pageSubscribe = page.subscribe(async (p) => {
 			if (p.url.pathname === '/' || p.url.pathname.startsWith('/folders/')) {
 				await tick();
-				initNewChat();
+				initNewChat(true);
+			} else {
+				loginSuggestionPrompts = null;
 			}
 
 			stopAudio();
@@ -1394,6 +1414,7 @@
 				chatTitle.set('');
 
 				window.removeEventListener('message', onMessageHandler);
+				window.removeEventListener('open-webui:new-chat', clearLoginSuggestions);
 				$socket?.off('events', chatEventHandler);
 				$socket?.off('connect', handleSocketConnect);
 				dismissContextCompactionToast();
@@ -1694,8 +1715,11 @@
 	// Web functions
 	//////////////////////////
 
-	const initNewChat = async () => {
+	const initNewChat = async (preserveLoginSuggestions = false) => {
 		console.log('initNewChat');
+		if (!preserveLoginSuggestions) {
+			loginSuggestionPrompts = null;
+		}
 		resetWebSearchConfirmation();
 
 		// Mark the outgoing chat as read before resetting; in-place created chats
@@ -4145,6 +4169,7 @@
 									{stopResponse}
 									{createMessagePair}
 									{onSelect}
+									suggestionPrompts={loginSuggestionPrompts}
 									{onUpload}
 									onWebSearchToggle={handleWebSearchToggle}
 									on:chatVariables={() => {

@@ -809,6 +809,7 @@
 	};
 
 	const newChatHandler = async () => {
+		window.dispatchEvent(new CustomEvent('open-webui:new-chat'));
 		selectedChatId = null;
 		selectedFolder.set(null);
 

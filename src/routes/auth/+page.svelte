@@ -18,6 +18,7 @@
 	} from '$lib/apis/auths';
 
 	import { WEBUI_API_BASE_URL, WEBUI_BASE_URL } from '$lib/constants';
+	import { markJiaoxiaoaiLoginSuggestionsPending } from '$lib/utils/jiaoxiaoaiLoginSuggestions';
 	import { WEBUI_NAME, config, user, socket } from '$lib/stores';
 
 	import { generateInitialsImage, canvasPixelTest, getUserTimezone } from '$lib/utils';
@@ -54,6 +55,9 @@
 			$socket.emit('user-join', { auth: { token: sessionUser.token } });
 			await user.set(sessionUser);
 			await config.set(await getBackendConfig());
+			if ($config?.features?.jiaoxiaoai_managed_mode && sessionUser.role !== 'admin') {
+				markJiaoxiaoaiLoginSuggestionsPending(sessionStorage);
+			}
 
 			// Update user timezone
 			const timezone = getUserTimezone();
