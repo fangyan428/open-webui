@@ -37,6 +37,18 @@
 
 {#key mounted}
 	<div class="m-auto w-full max-w-[58rem] px-8 lg:px-20">
+		<div class="mb-3 flex items-center gap-2.5" in:fade={{ duration: 200 }}>
+			<img
+				src="{WEBUI_BASE_URL}/branding/sai-logo.svg"
+				class="h-5 w-auto shrink-0"
+				alt="上海交通大学人工智能学院 SAI"
+				draggable="false"
+			/>
+			<span class="text-xs font-normal text-gray-500 dark:text-gray-400">
+				懂交大，也懂人工智能学院。
+			</span>
+		</div>
+
 		<div class="flex justify-start">
 			<div class="flex -space-x-4 mb-0.5" in:fade={{ duration: 200 }}>
 				{#each models as model, modelIdx}
@@ -61,7 +73,8 @@
 								alt="logo"
 								draggable="false"
 								on:error={(e) => {
-									e.currentTarget.src = '/favicon.png';
+									e.currentTarget.onerror = null;
+									e.currentTarget.src = '/branding/sai-symbol.svg';
 								}}
 							/>
 						</Tooltip>

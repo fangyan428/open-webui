@@ -88,7 +88,7 @@
 				<!-- svelte-ignore a11y-no-interactive-element-to-noninteractive-role -->
 				<button
 					role="listitem"
-					class="waterfall flex flex-col flex-1 shrink-0 w-full justify-between
+					class="sai-suggestion waterfall flex flex-col flex-1 shrink-0 w-full justify-between
 				       px-2.5 py-1.5 rounded-lg bg-transparent transition-colors
 				       hover:text-gray-950 dark:hover:text-white group"
 					style="animation-delay: {idx * 45}ms"

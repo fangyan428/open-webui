@@ -956,8 +956,8 @@
 							class=" self-center flex size-[30px] items-center justify-center rounded-lg transition group-hover:bg-gray-50 dark:group-hover:bg-gray-900"
 						>
 							<img
-								src="{WEBUI_BASE_URL}/static/favicon.png"
-								class="sidebar-new-chat-icon size-5 rounded-full group-hover:hidden"
+								src="{WEBUI_BASE_URL}/branding/sai-symbol.svg"
+								class="sidebar-new-chat-icon h-[22px] w-auto group-hover:hidden"
 								alt=""
 							/>
 
@@ -1134,8 +1134,8 @@
 				>
 					<img
 						crossorigin="anonymous"
-						src="{WEBUI_BASE_URL}/static/favicon.png"
-						class="sidebar-new-chat-icon size-5 rounded-full"
+						src="{WEBUI_BASE_URL}/branding/sai-symbol.svg"
+						class="sidebar-new-chat-icon h-[22px] w-auto"
 						alt=""
 					/>
 				</a>

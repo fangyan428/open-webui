@@ -66,6 +66,7 @@
 
 	let models = [];
 	let selectedModelIdx = 0;
+	const isSaiModel = (model) => model?.id === 'jiaoxiaoai' || model?.name === '交小AI';
 
 	$: if (selectedModels.length > 0) {
 		selectedModelIdx = models.length - 1;
@@ -129,12 +130,19 @@
 										}}
 									>
 										<img
-											src={`${WEBUI_API_BASE_URL}/models/model/profile/image?id=${model?.id}&lang=${$i18n.language}`}
-											class=" size-9 @sm:size-10 rounded-2xl"
+											src={isSaiModel(model)
+												? `${WEBUI_BASE_URL}/branding/sai-logo.svg`
+												: `${WEBUI_API_BASE_URL}/models/model/profile/image?id=${model?.id}&lang=${$i18n.language}`}
+											class="{isSaiModel(model)
+												? 'h-9 @sm:h-10 w-auto'
+												: 'size-9 @sm:size-10'} {isSaiModel(model)
+												? 'object-contain'
+												: 'rounded-2xl'}"
 											aria-hidden="true"
 											draggable="false"
 											on:error={(e) => {
-												e.currentTarget.src = '/favicon.png';
+												e.currentTarget.onerror = null;
+												e.currentTarget.src = '/branding/sai-symbol.svg';
 											}}
 										/>
 									</button>

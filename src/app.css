@@ -15,6 +15,15 @@
 /* --app-text-scale is updated via the UI Scale slider (Interface.svelte) */
 :root {
 	--app-text-scale: 1;
+	--sai-primary: #005556;
+	--sai-primary-hover: #0f7f52;
+	--sai-soft: rgb(29 170 117 / 0.07);
+	--sai-border: rgb(15 127 82 / 0.28);
+}
+
+.dark {
+	--sai-soft: rgb(29 170 117 / 0.11);
+	--sai-border: rgb(29 170 117 / 0.38);
 }
 
 html {
@@ -39,6 +48,33 @@ html {
 #sidebar-chat-item input {
 	/* editing state input height is kept in sync */
 	min-height: calc(20px * var(--app-text-scale, 1));
+}
+
+#sidebar .selected {
+	background-color: var(--sai-soft);
+}
+
+#message-input-container.sai-message-input:focus-within {
+	border-color: var(--sai-border);
+	outline: 3px solid var(--sai-soft);
+}
+
+.sai-send-button-active {
+	color: white;
+	background-color: var(--sai-primary);
+}
+
+.sai-send-button-active:hover {
+	background-color: var(--sai-primary-hover);
+}
+
+.sai-suggestion:hover {
+	background-color: var(--sai-soft);
+}
+
+.sai-suggestion:focus-visible {
+	outline: 2px solid var(--sai-border);
+	outline-offset: -2px;
 }
 
 code {
