@@ -7,7 +7,11 @@ from open_webui.utils.access_control.model_knowledge import (
     MODEL_RAG_ONLY_KEY,
     resolve_model_knowledge_for_inference,
 )
-from open_webui.utils.jiaoxiaoai import apply_jiaoxiaoai_managed_policy, seed_jiaoxiaoai_model
+from open_webui.utils.jiaoxiaoai import (
+    BUILTIN_WEB_SEARCH_DEFAULT_APPLIED,
+    apply_jiaoxiaoai_managed_policy,
+    seed_jiaoxiaoai_model,
+)
 
 
 def student() -> UserModel:
@@ -142,7 +146,8 @@ async def test_managed_policy_restores_defaults_without_overwriting_admin_model_
         access_grants=[],
         is_active=True,
     )
-    monkeypatch.setattr('open_webui.utils.jiaoxiaoai.Config.upsert', AsyncMock())
+    upsert = AsyncMock()
+    monkeypatch.setattr('open_webui.utils.jiaoxiaoai.Config.upsert', upsert)
     monkeypatch.setattr('open_webui.utils.jiaoxiaoai.Config.get', AsyncMock(return_value=''))
     monkeypatch.setattr('open_webui.utils.jiaoxiaoai.Models.get_model_by_id', AsyncMock(return_value=model))
     update = AsyncMock(return_value=model)
@@ -156,7 +161,47 @@ async def test_managed_policy_restores_defaults_without_overwriting_admin_model_
     assert form.meta.model_dump()['description'] == 'kept'
     assert form.meta.model_dump()['capabilities']['vision'] is True
     assert form.meta.model_dump()['capabilities']['web_search'] is True
-    assert 'web_search' in form.meta.model_dump()['defaultFeatureIds']
+    assert form.meta.model_dump()['defaultFeatureIds'] == ['image_generation']
+    managed_config = upsert.await_args.args[0]
+    assert managed_config['web.search.enable'] is False
+    assert managed_config[BUILTIN_WEB_SEARCH_DEFAULT_APPLIED] is True
+    assert managed_config['user.permissions']['features']['web_search'] is True
+
+
+@pytest.mark.asyncio
+async def test_managed_policy_preserves_admin_web_search_choice_after_default_is_applied(monkeypatch):
+    monkeypatch.setenv('JIAOXIAOAI_MANAGED_MODE', 'true')
+    model = SimpleNamespace(
+        id='jiaoxiaoai',
+        base_model_id='provider-model',
+        name='交小AI',
+        meta=SimpleNamespace(
+            model_dump=lambda **_: {
+                'capabilities': {'web_search': True},
+                'defaultFeatureIds': ['web_search'],
+            }
+        ),
+        params=SimpleNamespace(model_dump=lambda **_: {}),
+        access_grants=[],
+        is_active=True,
+    )
+
+    async def get_config(key, default=None):
+        if key == BUILTIN_WEB_SEARCH_DEFAULT_APPLIED:
+            return True
+        return default
+
+    upsert = AsyncMock()
+    monkeypatch.setattr('open_webui.utils.jiaoxiaoai.Config.get', get_config)
+    monkeypatch.setattr('open_webui.utils.jiaoxiaoai.Config.upsert', upsert)
+    monkeypatch.setattr('open_webui.utils.jiaoxiaoai.Models.get_model_by_id', AsyncMock(return_value=model))
+    update = AsyncMock(return_value=model)
+    monkeypatch.setattr('open_webui.utils.jiaoxiaoai.Models.update_model_by_id', update)
+
+    assert await apply_jiaoxiaoai_managed_policy() is True
+    managed_config = upsert.await_args.args[0]
+    assert 'web.search.enable' not in managed_config
+    assert update.await_args.args[1].meta.model_dump()['defaultFeatureIds'] == ['web_search']
 
 
 def test_managed_student_cannot_call_provider_routes_directly(monkeypatch):

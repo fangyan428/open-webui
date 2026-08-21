@@ -8,6 +8,7 @@ from open_webui.config import Config
 from open_webui.models.models import ModelForm, Models
 
 log = logging.getLogger(__name__)
+BUILTIN_WEB_SEARCH_DEFAULT_APPLIED = 'jiaoxiaoai.builtin_web_search_default_applied'
 
 
 def managed_mode_enabled() -> bool:
@@ -86,6 +87,7 @@ async def apply_jiaoxiaoai_managed_policy() -> bool:
         return False
 
     model_id = managed_model_id()
+    web_search_default_applied = bool(await Config.get(BUILTIN_WEB_SEARCH_DEFAULT_APPLIED, False))
     permissions = dict(await Config.get('user.permissions', {}) or {})
     feature_permissions = dict(permissions.get('features') or {})
     feature_permissions.update(
@@ -113,27 +115,30 @@ async def apply_jiaoxiaoai_managed_policy() -> bool:
         }
     )
     permissions['workspace'] = workspace_permissions
-    await Config.upsert(
-        {
-            'ui.enable_signup': True,
-            'ui.default_user_role': 'user',
-            'ui.default_models': model_id,
-            'ui.default_pinned_models': model_id,
-            'auth.enable_api_keys': False,
-            'automations.enable': False,
-            'calendar.enable': False,
-            'channels.enable': False,
-            'direct.enable': False,
-            'folders.enable': False,
-            'memories.enable': False,
-            'notes.enable': False,
-            'web.search.confirmation.enable': False,
-            'web.search.enable': True,
-            'user.permissions': permissions,
-        }
-    )
-    if not await Config.get('web.search.engine'):
-        await Config.upsert({'web.search.engine': 'duckduckgo'})
+    managed_config = {
+        'ui.enable_signup': True,
+        'ui.default_user_role': 'user',
+        'ui.default_models': model_id,
+        'ui.default_pinned_models': model_id,
+        'auth.enable_api_keys': False,
+        'automations.enable': False,
+        'calendar.enable': False,
+        'channels.enable': False,
+        'direct.enable': False,
+        'folders.enable': False,
+        'memories.enable': False,
+        'notes.enable': False,
+        'web.search.confirmation.enable': False,
+        'user.permissions': permissions,
+    }
+    if not web_search_default_applied:
+        managed_config.update(
+            {
+                'web.search.enable': False,
+                BUILTIN_WEB_SEARCH_DEFAULT_APPLIED: True,
+            }
+        )
+    await Config.upsert(managed_config)
 
     model = await Models.get_model_by_id(model_id)
     if not model:
@@ -152,10 +157,12 @@ async def apply_jiaoxiaoai_managed_policy() -> bool:
         }
     )
     meta['capabilities'] = capabilities
-    feature_ids = list(meta.get('defaultFeatureIds') or [])
-    if 'web_search' not in feature_ids:
-        feature_ids.append('web_search')
-    meta['defaultFeatureIds'] = feature_ids
+    if not web_search_default_applied:
+        meta['defaultFeatureIds'] = [
+            feature_id
+            for feature_id in (meta.get('defaultFeatureIds') or [])
+            if feature_id != 'web_search'
+        ]
 
     await Models.update_model_by_id(
         model_id,
