@@ -1127,6 +1127,17 @@ async def _set_direct_model(request: Request, model_item: dict, user) -> None:
     request.state.model = model_item
 
 
+def _select_model_for_chat_fanout(
+    target_model_id: str,
+    request_model_id: str,
+    request_model: dict,
+    cached_models: dict[str, dict],
+) -> dict:
+    if target_model_id == request_model_id:
+        return request_model
+    return cached_models.get(target_model_id, request_model)
+
+
 @app.post('/api/chat/completions')
 @app.post('/api/v1/chat/completions')  # Experimental: Compatibility with OpenAI API
 async def chat_completion(
@@ -1821,8 +1832,15 @@ async def chat_completion(
                 'metadata': per_model_metadata,
             }
 
-            # Resolve the model object for this specific model
-            resolved_model = request.app.state.MODELS.get(target_model_id, model)
+            # Preserve the request-scoped model copy for the requested model.
+            # It may contain inference-only Knowledge authorization markers
+            # that must never be replaced by the shared application cache.
+            resolved_model = _select_model_for_chat_fanout(
+                target_model_id,
+                model_id,
+                model,
+                request.app.state.MODELS,
+            )
 
             # Only the first model runs chat-level background tasks;
             # subsequent models only run follow-ups.

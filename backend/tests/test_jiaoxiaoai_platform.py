@@ -18,6 +18,39 @@ def student() -> UserModel:
     return UserModel.model_construct(id='student-1', role='user')
 
 
+def test_chat_fanout_preserves_request_scoped_model_knowledge():
+    from open_webui.main import _select_model_for_chat_fanout
+
+    request_model = {
+        'id': 'jiaoxiaoai',
+        'info': {
+            'meta': {
+                'knowledge': [
+                    {
+                        'type': 'collection',
+                        'id': 'kb-1',
+                        MODEL_RAG_ONLY_KEY: True,
+                    }
+                ]
+            }
+        },
+    }
+    cached_model = {
+        'id': 'jiaoxiaoai',
+        'info': {'meta': {'knowledge': [{'type': 'collection', 'id': 'kb-1'}]}},
+    }
+
+    selected = _select_model_for_chat_fanout(
+        target_model_id='jiaoxiaoai',
+        request_model_id='jiaoxiaoai',
+        request_model=request_model,
+        cached_models={'jiaoxiaoai': cached_model},
+    )
+
+    assert selected is request_model
+    assert selected['info']['meta']['knowledge'][0][MODEL_RAG_ONLY_KEY] is True
+
+
 @pytest.mark.asyncio
 async def test_model_collection_without_direct_grant_is_rag_only(monkeypatch):
     monkeypatch.setattr(

@@ -29,7 +29,7 @@ services:
     env_file:
       - ./deploy/jiaoxiaoai.env
     ports:
-      - '${JIAOXIAOAI_LISTEN_ADDR-0.0.0.0}:${JIAOXIAOAI_PORT-3001}:8080'
+      - '${JIAOXIAOAI_LISTEN_ADDR-127.0.0.1}:${JIAOXIAOAI_PORT-3001}:8080'
     volumes:
       - ./.cptr/jiaoxiaoai-data:/app/backend/data
       - ./deploy/managed:/app/managed:ro

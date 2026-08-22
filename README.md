@@ -1,5 +1,7 @@
 # Open WebUI 👋
 
+> **交小AI 分支部署：** 先从 `deploy/jiaoxiaoai.env.example` 创建未跟踪的 `deploy/jiaoxiaoai.env`，再在仓库根目录执行 `docker compose -f docker-compose.jiaoxiaoai.yaml up -d --build`，访问 `http://127.0.0.1:3001`。完整说明见 [docs/JIAOXIAOAI_PHASE1.md](docs/JIAOXIAOAI_PHASE1.md)。
+
 ![GitHub stars](https://img.shields.io/github/stars/open-webui/open-webui?style=social)
 ![GitHub forks](https://img.shields.io/github/forks/open-webui/open-webui?style=social)
 ![GitHub watchers](https://img.shields.io/github/watchers/open-webui/open-webui?style=social)

@@ -7,12 +7,11 @@ node_modules
 /package
 .env
 .env.*
-/deploy/jiaoxiaoai.env
-# Managed Knowledge content stays on the deployment host. Commit manifests and
-# directory scaffolding, not institutional documents or generated RAG sources.
-/deploy/managed/knowledge/**/files/**
-!/deploy/managed/knowledge/**/files/.gitkeep
 !.env.example
+/deploy/jiaoxiaoai.env
+!/deploy/jiaoxiaoai.env.example
+# deploy/managed is the versioned, declarative deployment source. Runtime
+# uploads, parsed files, vectors, accounts and chats live under .cptr instead.
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 # Byte-compiled / optimized / DLL files
@@ -315,4 +314,4 @@ dist
 cypress/videos
 cypress/screenshots
 .vscode/settings.json
-.cptr
+.cptr/
