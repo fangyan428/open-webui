@@ -71,11 +71,11 @@
 		</button>
 		<button
 			class="bg-white p-5 text-left hover:bg-gray-50 dark:bg-gray-950 dark:hover:bg-gray-900"
-			on:click={() => openAdminSetting('web')}
+			on:click={() => openAdminSetting('integrations')}
 		>
-			<span class="text-base font-medium">联网搜索</span>
+			<span class="text-base font-medium">博查联网搜索</span>
 			<span class="mt-1 block text-sm text-gray-500"
-				>当前默认使用 DuckDuckGo，后续可切换 SearXNG。</span
+				>默认通过只读 MCP 开启；模型内置 web_search 保持关闭。</span
 			>
 		</button>
 		<button

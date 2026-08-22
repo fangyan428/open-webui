@@ -9,3 +9,8 @@ This repository contains code governed by multiple licenses based on the date an
 3. All code contributed or modified after commit 60d84a3aae9802339705826e9095e272e3c83623 is licensed under the Open WebUI License (see LICENSE).
 
 For details on which commits are covered by which license, refer to LICENSE_HISTORY.
+
+## MiSans
+
+`static/assets/fonts/MiSans-Semibold.woff2` uses the MiSans typeface by Xiaomi Inc. under the
+[MiSans Font Intellectual Property License Agreement](https://hyperos.mi.com/font/en/download/).

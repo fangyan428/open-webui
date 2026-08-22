@@ -1,0 +1,17 @@
+url: http://bocha-mcp:8000/mcp
+path: ''
+type: mcp
+auth_type: none
+headers: {}
+key: ''
+config:
+  enable: true
+  function_name_filter_list: bocha_web_search
+  access_grants:
+    - principal_type: user
+      principal_id: '*'
+      permission: read
+info:
+  id: bocha
+  name: 博查联网搜索
+  description: 博查全网实时搜索（只读）

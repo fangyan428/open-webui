@@ -28,6 +28,7 @@
 	import MessageInput from './MessageInput.svelte';
 	import FolderPlaceholder from './Placeholder/FolderPlaceholder.svelte';
 	import FolderTitle from './Placeholder/FolderTitle.svelte';
+	import JiaoxiaoAIWordmark from '$lib/components/common/JiaoxiaoAIWordmark.svelte';
 
 	const i18n = getContext('i18n');
 
@@ -112,7 +113,7 @@
 					}}
 				/>
 			{:else}
-				<div class="flex flex-row justify-center gap-2.5 @sm:gap-3 w-fit px-5 max-w-xl">
+				<div class="flex w-fit max-w-full flex-row justify-center gap-3 px-5 @sm:gap-3.5">
 					<div class="flex shrink-0 justify-center">
 						<div class="flex -space-x-4 mb-0.5" in:fade={{ duration: 100 }}>
 							{#each models as model, modelIdx}
@@ -154,18 +155,24 @@
 					</div>
 
 					<div
-						class=" text-2xl @sm:text-2xl line-clamp-1 flex items-center"
+						class="flex min-w-0 items-center text-[26px] @sm:text-[28px]"
 						in:fade={{ duration: 100 }}
 					>
 						{#if models[selectedModelIdx]?.name}
 							<Tooltip
 								content={models[selectedModelIdx]?.name}
 								placement="top"
-								className=" flex items-center "
+								className="flex min-w-0 items-center"
 							>
-								<span class="line-clamp-1">
-									{models[selectedModelIdx]?.name}
-								</span>
+								{#if isSaiModel(models[selectedModelIdx])}
+									<span class="flex-none whitespace-nowrap">
+										<JiaoxiaoAIWordmark />
+									</span>
+								{:else}
+									<span class="line-clamp-1">
+										{models[selectedModelIdx]?.name}
+									</span>
+								{/if}
 							</Tooltip>
 						{:else}
 							{$i18n.t('Hello, {{name}}', { name: $user?.name })}

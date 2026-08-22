@@ -1,11 +1,10 @@
-services:
-  ollama:
-    profiles:
-      - ollama
+name: jiaoxiaoai
 
+services:
   open-webui:
-    container_name: jiaoxiaoai
     build:
+      context: .
+      dockerfile: Dockerfile
       network: ${JIAOXIAOAI_BUILD_NETWORK-default}
       args:
         ALPINE_MIRROR: ${JIAOXIAOAI_ALPINE_MIRROR-https://dl-cdn.alpinelinux.org/alpine}
@@ -21,12 +20,40 @@ services:
         PYTORCH_CPU_INDEX_URL: ${JIAOXIAOAI_PYTORCH_CPU_INDEX_URL-https://download.pytorch.org/whl/cpu}
         TIKTOKEN_TOKENIZER_URL: ${JIAOXIAOAI_TIKTOKEN_TOKENIZER_URL-}
         UV_INDEX_URL: ${JIAOXIAOAI_PYPI_INDEX_URL-https://pypi.org/simple}
-    depends_on: !reset []
+    image: ${JIAOXIAOAI_IMAGE-jiaoxiaoai:local}
+    container_name: jiaoxiaoai
+    restart: unless-stopped
+    depends_on:
+      bocha-mcp:
+        condition: service_healthy
     env_file:
       - ./deploy/jiaoxiaoai.env
-    environment: !reset []
-    ports: !override
-      - "3001:8080"
-    volumes: !override
+    ports:
+      - '${JIAOXIAOAI_LISTEN_ADDR-0.0.0.0}:${JIAOXIAOAI_PORT-3001}:8080'
+    volumes:
       - ./.cptr/jiaoxiaoai-data:/app/backend/data
       - ./deploy/managed:/app/managed:ro
+    extra_hosts:
+      - host.docker.internal:host-gateway
+
+  bocha-mcp:
+    image: ${JIAOXIAOAI_BOCHA_MCP_IMAGE-jiaoxiaoai-bocha-mcp:0.1.0}
+    build:
+      context: ./deploy/bocha-mcp
+      network: ${JIAOXIAOAI_BUILD_NETWORK-default}
+      args:
+        HTTP_PROXY: ${JIAOXIAOAI_BUILD_PROXY-}
+        HTTPS_PROXY: ${JIAOXIAOAI_BUILD_PROXY-}
+        NO_PROXY: ${JIAOXIAOAI_BUILD_NO_PROXY-localhost,127.0.0.1,::1}
+        PIP_INDEX_URL: ${JIAOXIAOAI_PYPI_INDEX_URL-https://pypi.org/simple}
+    restart: unless-stopped
+    env_file:
+      - ./deploy/jiaoxiaoai.env
+    expose:
+      - '8000'
+    healthcheck:
+      test: ['CMD', 'python', '-c', "import socket; socket.create_connection(('127.0.0.1', 8000), 5).close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s

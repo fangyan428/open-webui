@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi import HTTPException
 from open_webui.utils.jiaoxiaoai_knowledge import (
+    _replace_model_attachments,
     discover_managed_sources,
     stable_knowledge_id,
     sync_managed_knowledge,
@@ -84,6 +85,58 @@ async def test_unchanged_managed_file_is_idempotent_and_overlay_is_ignored(monke
 def test_stable_knowledge_id_is_repeatable_and_directory_specific():
     assert stable_knowledge_id('campus') == stable_knowledge_id('campus')
     assert stable_knowledge_id('campus') != stable_knowledge_id('library')
+
+
+@pytest.mark.asyncio
+async def test_model_attachment_sync_replaces_duplicate_without_removing_last_good_entries(monkeypatch):
+    model = SimpleNamespace(
+        id='jiaoxiaoai',
+        base_model_id='provider-model',
+        name='交小AI',
+        meta=SimpleNamespace(
+            model_dump=lambda **_: {
+                'knowledge': [
+                    {'type': 'collection', 'id': 'kb-campus', 'name': '旧绑定'},
+                    {
+                        'type': 'collection',
+                        'id': 'kb-removed',
+                        'name': '已移除的托管库',
+                        'jiaoxiaoai_managed': True,
+                    },
+                    {'type': 'collection', 'id': 'admin-kb', 'name': '管理员资料'},
+                ]
+            }
+        ),
+        params=SimpleNamespace(model_dump=lambda **_: {}),
+        access_grants=[],
+        is_active=True,
+    )
+    monkeypatch.setattr(
+        'open_webui.utils.jiaoxiaoai_knowledge.Models.get_model_by_id',
+        AsyncMock(return_value=model),
+    )
+    update = AsyncMock()
+    monkeypatch.setattr('open_webui.utils.jiaoxiaoai_knowledge.Models.update_model_by_id', update)
+    replacement = {
+        'type': 'collection',
+        'id': 'kb-campus',
+        'name': '校内资料',
+        'jiaoxiaoai_managed': True,
+    }
+
+    await _replace_model_attachments([replacement])
+
+    form = update.await_args.args[1]
+    assert form.meta.knowledge == [
+        {
+            'type': 'collection',
+            'id': 'kb-removed',
+            'name': '已移除的托管库',
+            'jiaoxiaoai_managed': True,
+        },
+        {'type': 'collection', 'id': 'admin-kb', 'name': '管理员资料'},
+        replacement,
+    ]
 
 
 def test_source_discovery_supports_subdirectories_and_ignores_os_metadata_and_duplicates(tmp_path):

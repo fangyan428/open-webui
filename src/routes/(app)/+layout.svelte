@@ -229,6 +229,10 @@
 
 	const gotoAuth = async () => {
 		const currentUrl = `${$page.url.pathname}${$page.url.search}`;
+		if ($page.url.pathname === '/') {
+			await goto('/welcome');
+			return;
+		}
 		await goto(`/auth?redirect=${encodeURIComponent(currentUrl)}`);
 	};
 

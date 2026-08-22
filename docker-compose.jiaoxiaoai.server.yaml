@@ -5,6 +5,9 @@ services:
     image: ${JIAOXIAOAI_IMAGE:?Set JIAOXIAOAI_IMAGE to the published image}
     container_name: jiaoxiaoai
     restart: unless-stopped
+    depends_on:
+      bocha-mcp:
+        condition: service_healthy
     env_file:
       - ./deploy/jiaoxiaoai.env
     ports:
@@ -14,3 +17,25 @@ services:
       - ./deploy/managed:/app/managed:ro
     extra_hosts:
       - host.docker.internal:host-gateway
+
+  bocha-mcp:
+    image: ${JIAOXIAOAI_BOCHA_MCP_IMAGE-jiaoxiaoai-bocha-mcp:0.1.0}
+    build:
+      context: ./deploy/bocha-mcp
+      network: ${JIAOXIAOAI_BUILD_NETWORK-default}
+      args:
+        HTTP_PROXY: ${JIAOXIAOAI_BUILD_PROXY-}
+        HTTPS_PROXY: ${JIAOXIAOAI_BUILD_PROXY-}
+        NO_PROXY: ${JIAOXIAOAI_BUILD_NO_PROXY-localhost,127.0.0.1,::1}
+        PIP_INDEX_URL: ${JIAOXIAOAI_PYPI_INDEX_URL-https://pypi.org/simple}
+    restart: unless-stopped
+    env_file:
+      - ./deploy/jiaoxiaoai.env
+    expose:
+      - '8000'
+    healthcheck:
+      test: ['CMD', 'python', '-c', "import socket; socket.create_connection(('127.0.0.1', 8000), 5).close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s

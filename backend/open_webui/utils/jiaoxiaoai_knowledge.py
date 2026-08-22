@@ -108,11 +108,14 @@ async def _replace_model_attachments(attachments: list[dict]) -> None:
         return
     meta = model.meta.model_dump(exclude_none=True)
     existing = list(meta.get('knowledge') or [])
-    replacement_ids = {item['id'] for item in attachments}
+    replacement_keys = {(item.get('type'), item.get('id')) for item in attachments}
     kept = [
         item
         for item in existing
-        if not (isinstance(item, dict) and item.get(MANAGED_MARKER) and item.get('id') in replacement_ids)
+        if not (
+            isinstance(item, dict)
+            and (item.get('type'), item.get('id')) in replacement_keys
+        )
     ]
     meta['knowledge'] = kept + attachments
     await Models.update_model_by_id(

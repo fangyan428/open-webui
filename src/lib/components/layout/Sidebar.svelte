@@ -67,6 +67,7 @@
 	import Spinner from '../common/Spinner.svelte';
 	import Loader from '../common/Loader.svelte';
 	import Folder from '../common/Folder.svelte';
+	import JiaoxiaoAIWordmark from '../common/JiaoxiaoAIWordmark.svelte';
 	import SidebarSection from './Sidebar/Section.svelte';
 	import Tooltip from '../common/Tooltip.svelte';
 	import Folders from './Sidebar/Folders.svelte';
@@ -97,6 +98,7 @@
 	const DEFAULT_PINNED_ITEMS = ['notes', 'workspace'];
 
 	let scrollTop = 0;
+	$: isJiaoxiaoAIName = $WEBUI_NAME.replace(/\s*\(Open WebUI\)\s*$/, '').trim() === '交小AI';
 
 	let navElement;
 	let shiftKey = false;
@@ -1141,12 +1143,13 @@
 					/>
 				</a>
 
-				<a href="/" class="flex flex-1 px-0.5" on:click={newChatHandler}>
-					<div
-						id="sidebar-webui-name"
-						class=" self-center font-normal text-gray-700 dark:text-gray-200"
-					>
-						{$WEBUI_NAME}
+				<a href="/" class="flex min-w-0 flex-1 px-0.5" on:click={newChatHandler}>
+					<div id="sidebar-webui-name" class="self-center flex min-w-0 items-baseline font-normal">
+						{#if isJiaoxiaoAIName}
+							<JiaoxiaoAIWordmark showTechnicalSource={true} />
+						{:else}
+							{$WEBUI_NAME}
+						{/if}
 					</div>
 				</a>
 				<Tooltip

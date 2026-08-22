@@ -1,6 +1,6 @@
-# 交小AI第一阶段部署与权限模型
+# 交小AI部署、入口与权限模型
 
-本阶段使用 Open WebUI 原生账号验证流程，不改变认证中间件、用户表或 OAuth/SSO 路由，因此后续可继续接入 jAccount / OIDC。
+SAI 展示页已作为 `/welcome` 路由并入 Open WebUI 的同一个前端构建。未登录访问根路径 `/` 时会先进入展示页，点击“进入交小AI”后跳转至 `/auth?redirect=/`，登录成功再进入原聊天首页。整个流程使用同源路由和 Open WebUI 原生账号验证，不改变认证中间件、用户表或 OAuth/SSO 路由，因此后续可继续接入 jAccount / OIDC。
 
 ## 首次部署
 
@@ -8,11 +8,13 @@
 2. 启动：
 
    ```bash
-   docker compose -f docker-compose.yaml -f docker-compose.jiaoxiaoai.yaml up -d --build
+   docker compose -f docker-compose.jiaoxiaoai.yaml up -d --build
    ```
 
 3. 第一个注册账号按 Open WebUI 原有逻辑成为管理员。托管策略会保持注册开启，并让后续账号直接成为普通用户，不经过 pending。
 4. 启动时会创建公开只读的 `交小AI` Workspace Model，并恢复学生权限和默认模型。内置 Web Search 默认关闭且不会成为新会话的默认功能，联网搜索由模型绑定的托管 MCP 提供；管理员仍可按需显式启用内置搜索。管理员修改的 Provider、底层模型、名称、提示词和参数不会被重启覆盖。
+
+`docker-compose.jiaoxiaoai.yaml` 是可独立运行的单文件 Compose：它从当前仓库构建一个包含 SAI 展示页、Open WebUI 前端和后端的镜像，并在同一个端口提供页面、认证和 API。默认监听 `0.0.0.0:3001`；可通过 `JIAOXIAOAI_LISTEN_ADDR` 和 `JIAOXIAOAI_PORT` 调整。生产服务器若由 Nginx/Caddy 提供 HTTPS，可将监听地址设为 `127.0.0.1`。
 
 ## Knowledge 目录与网页追加
 
@@ -24,7 +26,7 @@
 ## MCP 目录
 
 - 每个连接使用 `deploy/managed/mcp/*.yaml`；`${ENV_NAME}` 会从私有 `deploy/jiaoxiaoai.env` 解析，仓库不保存真实密钥。
-- 启动会自动载入并绑定到交小AI；坏 YAML 或缺密钥不会阻止聊天和 RAG，也不会清空上一次有效配置。
+- 启动会自动载入并绑定到交小AI；默认包含高德 MCP 和只读的博查 `bocha_web_search`。坏 YAML 或缺密钥不会阻止聊天和 RAG，也不会清空上一次有效配置。
 - 模板内必须明确 `enable`、工具白名单和 `access_grants`。普通用户只能调用被开放的工具，不能查看 URL、Token 或认证信息。
 - Admin 的“交小AI设置”页可手动重试 Knowledge 同步或 MCP 加载。
 
