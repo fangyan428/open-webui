@@ -3,14 +3,14 @@
 	import { showSettings } from '$lib/stores';
 	import { toast } from 'svelte-sonner';
 
-	let syncing: 'knowledge' | 'mcp' | null = null;
+	let syncing: 'knowledge' | 'mcp' | 'plugins' | null = null;
 	let lastResult: Record<string, any> | null = null;
 
 	const openAdminSetting = (tab: string) => {
 		showSettings.set(`admin:${tab}`);
 	};
 
-	const synchronize = async (kind: 'knowledge' | 'mcp') => {
+	const synchronize = async (kind: 'knowledge' | 'mcp' | 'plugins') => {
 		syncing = kind;
 		lastResult = null;
 		try {
@@ -89,7 +89,9 @@
 
 	<section class="mt-8 rounded-2xl border border-gray-200 p-5 dark:border-gray-800">
 		<h2 class="text-base font-medium">从服务器目录同步</h2>
-		<p class="mt-1 text-sm text-gray-500">部署时会自动同步。修改托管目录后，可在这里立即重试。</p>
+		<p class="mt-1 text-sm text-gray-500">
+			部署时会自动同步 Knowledge、MCP 和托管插件。修改服务器目录后，可在这里立即重试。
+		</p>
 		<div class="mt-4 flex flex-wrap gap-2">
 			<button
 				class="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-gray-900"
@@ -104,6 +106,13 @@
 				on:click={() => synchronize('mcp')}
 			>
 				{syncing === 'mcp' ? '正在同步…' : '重新加载 MCP'}
+			</button>
+			<button
+				class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium disabled:opacity-50 dark:border-gray-700"
+				disabled={syncing !== null}
+				on:click={() => synchronize('plugins')}
+			>
+				{syncing === 'plugins' ? '正在同步…' : '同步插件'}
 			</button>
 		</div>
 		{#if lastResult}

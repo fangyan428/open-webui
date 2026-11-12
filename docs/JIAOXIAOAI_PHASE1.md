@@ -55,6 +55,16 @@ Compose 只重建/替换容器，不会删除宿主机持久化目录。不要�
 - 模板内必须明确 `enable`、工具白名单和 `access_grants`。普通用户只能调用被开放的工具，不能查看 URL、Token 或认证信息。
 - Admin 的“交小AI设置”页可手动重试 Knowledge 同步或 MCP 加载。
 
+## 插件目录
+
+- Functions 使用 `deploy/managed/plugins/functions/*.json`，Tools 使用 `deploy/managed/plugins/tools/*.json`。文件可以直接采用 Admin UI 的“导出 JSON”格式。
+- 启动会自动同步并绑定托管 Tools 到交小AI模型；Admin 的“交小AI设置”页可手动点击“同步插件”。
+- 同步器只更新和删除带 `jiaoxiaoai_managed` 标记的记录，不覆盖用户或其他管理员手工创建的插件。托管 ID 与现有非托管插件冲突、JSON 无效或代码加载失败时，本次扫描不会应用任何修改。
+- 从托管目录删除插件文件后再次同步会删除对应托管插件；需要保留本地插件时不要把它放进托管目录。
+- Functions/Tools 可执行服务器端 Python 代码。托管插件应在 Git 中评审、固定依赖版本，并通过环境变量读取密钥，不能提交真实密钥。
+- 内置的 `weekly_email_digest` 插件允许每位用户分别配置自己的交大邮箱和 QQ 邮箱，通过 IMAP 只读取最近七天收件箱，并由每用户自动化在周六 22:00 生成任务清单。
+- 邮箱密码和 QQ 授权码只进入该用户的加密 Tool UserValves；不同用户共享插件代码，但不共享邮件凭据。邮件正文会交给所配置的模型 Provider 进行摘要，部署说明必须向用户明确说明这一数据边界。
+
 普通用户使用模型时，模型附带但未直接共享的 Knowledge 会被标为“仅模型 RAG”：后端只提供语义检索，不提供知识库浏览、文件列表、grep、全文查看或下载。Knowledge 与 File HTTP API 继续要求独立 read 权限。
 
 ## 数据持久化（第一阶段）

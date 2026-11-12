@@ -383,6 +383,16 @@ async def lifespan(app: FastAPI):
                 log.warning('Managed MCP startup sync completed with errors: %s', mcp_sync['errors'])
         except Exception as exc:
             log.exception('Managed MCP startup sync failed: %s', exc)
+        try:
+            from open_webui.utils.jiaoxiaoai_plugins import sync_managed_plugins
+
+            plugin_sync = await sync_managed_plugins()
+            if plugin_sync['errors']:
+                log.warning('Managed plugin startup sync completed with errors: %s', plugin_sync['errors'])
+            else:
+                log.info('Managed plugin startup sync completed: %s', plugin_sync)
+        except Exception as exc:
+            log.exception('Managed plugin startup sync failed: %s', exc)
 
     if SAFE_MODE:
         await Functions.deactivate_all_functions()
@@ -966,6 +976,13 @@ async def sync_jiaoxiaoai_mcp(request: Request, user=Depends(get_admin_user)):
     from open_webui.utils.jiaoxiaoai_mcp import sync_managed_mcp
 
     return await sync_managed_mcp(request)
+
+
+@app.post('/api/v1/jiaoxiaoai/plugins/sync')
+async def sync_jiaoxiaoai_plugins(user=Depends(get_admin_user)):
+    from open_webui.utils.jiaoxiaoai_plugins import sync_managed_plugins
+
+    return await sync_managed_plugins()
 
 
 class ModelUnloadForm(BaseModel):

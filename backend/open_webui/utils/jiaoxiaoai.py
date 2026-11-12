@@ -93,7 +93,7 @@ async def apply_jiaoxiaoai_managed_policy() -> bool:
     feature_permissions.update(
         {
             'api_keys': False,
-            'automations': False,
+            'automations': True,
             'calendar': False,
             'channels': False,
             'direct_tool_servers': False,
@@ -121,7 +121,7 @@ async def apply_jiaoxiaoai_managed_policy() -> bool:
         'ui.default_models': model_id,
         'ui.default_pinned_models': model_id,
         'auth.enable_api_keys': False,
-        'automations.enable': False,
+        'automations.enable': True,
         'calendar.enable': False,
         'channels.enable': False,
         'direct.enable': False,
